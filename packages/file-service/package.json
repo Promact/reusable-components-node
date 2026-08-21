@@ -5,8 +5,10 @@
   "description": "Provider-agnostic file storage service (AWS S3, Azure Blob Storage) — Node.js port of the .NET file-service nuget package",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": ["dist"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build",
     "test": "jest"
   },
   "dependencies": {

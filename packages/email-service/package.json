@@ -1,11 +1,14 @@
 {
   "name": "email-service",
   "version": "1.0.0",
+  "private": true,
   "description": "Provider-agnostic email sending service (AWS SES, SendGrid, SMTP, Azure Communication Services)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": ["dist"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build",
     "test": "jest"
   },
   "dependencies": {
