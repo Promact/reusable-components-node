@@ -1,0 +1,24 @@
+{
+  "name": "file-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Provider-agnostic file storage service (AWS S3, Azure Blob Storage) — Node.js port of the .NET file-service nuget package",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.700.0",
+    "@aws-sdk/s3-request-presigner": "^3.700.0",
+    "@azure/storage-blob": "^12.26.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.10.5",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.7.2"
+  }
+}
