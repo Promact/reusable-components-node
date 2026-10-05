@@ -2,6 +2,12 @@
 
 Provider-agnostic email sending for Node.js/TypeScript — AWS SES, SendGrid, SMTP, and Azure Communication Services behind one `IEmailService` interface. Behavioral port of the .NET `nuget-packages/email-service` library; see `docs/specs/nuget-packages-spec.md` §1 for the full functional spec.
 
+## Installation
+
+```bash
+npm install @promact/email-service
+```
+
 ## Usage
 
 ```ts
