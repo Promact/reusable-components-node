@@ -10,14 +10,22 @@ This is an npm workspaces monorepo with three independent packages under
 
 | Package | Providers | Spec section |
 |---|---|---|
-| [`email-service`](packages/email-service) | AWS SES, SendGrid, SMTP, Azure Communication Services | §1 |
-| [`file-service`](packages/file-service) | AWS S3, Azure Blob Storage | §2 |
-| [`feature-flag-management`](packages/feature-flag-management) | PostHog, LaunchDarkly, Unleash | §3 |
+| [`@promact/email-service`](packages/email-service) | AWS SES, SendGrid, SMTP, Azure Communication Services | §1 |
+| [`@promact/file-service`](packages/file-service) | AWS S3, Azure Blob Storage | §2 |
+| [`@promact/feature-flag-management`](packages/feature-flag-management) | PostHog, LaunchDarkly, Unleash | §3 |
 
 Each package exposes one provider-agnostic interface (`IEmailService`,
 `IFileService<TFileModel>`, `IFeatureFlagService`); the concrete provider is
 selected at wiring time via a `createXxxService(options)` factory. See each
 package's own README/source for usage.
+
+## Installation
+
+```bash
+npm install @promact/email-service
+npm install @promact/file-service
+npm install @promact/feature-flag-management
+```
 
 ## Development
 
@@ -39,3 +47,30 @@ No real network/cloud calls are made in tests — provider SDKs are mocked.
 
 `.github/workflows/ci.yml` runs `npm ci`, `npm run build`, `npm run lint`,
 and `npm test` on every push and pull request against `master`.
+
+## Publishing
+
+Packages are published to npm under the `@promact` scope by
+`.github/workflows/publish.yml`, which runs when a GitHub Release is published
+(or manually via "Run workflow"). It builds, lints, and tests, then publishes
+any package whose version isn't on npm yet. It authenticates with
+[npm trusted publishing](https://docs.npmjs.com/trusted-publishers), so no npm
+token is stored in the repo.
+
+To release:
+
+1. Bump the `version` of each package you changed (e.g.
+   `npm version patch -w @promact/email-service`) and merge to `master`.
+2. Create a GitHub Release. Versions already on npm are skipped, so only
+   bumped packages are published.
+
+### First-time setup
+
+Trusted publishing is configured per package, so each package must exist on
+npm before CI can publish it:
+
+1. Publish the first version manually from a maintainer's machine:
+   `npm login`, then `npm run build && npm publish --workspaces`.
+2. On npmjs.com, for each `@promact/*` package: **Settings → Trusted
+   Publisher → GitHub Actions**, with organization `Promact`, repository
+   `reusable-components-node`, and workflow `publish.yml`.

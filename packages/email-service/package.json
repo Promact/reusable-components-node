@@ -1,11 +1,25 @@
 {
-  "name": "email-service",
+  "name": "@promact/email-service",
   "version": "1.0.0",
-  "private": true,
   "description": "Provider-agnostic email sending service (AWS SES, SendGrid, SMTP, Azure Communication Services)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Promact/reusable-components-node.git",
+    "directory": "packages/email-service"
+  },
+  "homepage": "https://github.com/Promact/reusable-components-node/tree/master/packages/email-service#readme",
+  "bugs": {
+    "url": "https://github.com/Promact/reusable-components-node/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "prepublishOnly": "npm run build",

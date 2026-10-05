@@ -1,11 +1,25 @@
 {
-  "name": "feature-flag-management",
+  "name": "@promact/feature-flag-management",
   "version": "1.0.0",
-  "private": true,
   "description": "Provider-agnostic feature flag service (PostHog, LaunchDarkly, Unleash)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Promact/reusable-components-node.git",
+    "directory": "packages/feature-flag-management"
+  },
+  "homepage": "https://github.com/Promact/reusable-components-node/tree/master/packages/feature-flag-management#readme",
+  "bugs": {
+    "url": "https://github.com/Promact/reusable-components-node/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "prepublishOnly": "npm run build",
