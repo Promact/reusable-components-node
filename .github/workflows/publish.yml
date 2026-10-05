@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # required for npm provenance
+      id-token: write # required for npm trusted publishing (OIDC) and provenance
     steps:
       - uses: actions/checkout@v4
 
@@ -19,7 +19,10 @@ jobs:
         with:
           node-version: 22.x
           cache: npm
-          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm >= 11.5.1; Node 22 ships with npm 10.
+      - name: Update npm
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: npm ci
@@ -33,9 +36,9 @@ jobs:
       - name: Test
         run: npm test
 
+      # Authenticates via npm trusted publishing (no token). Each package must have
+      # this repo + publish.yml configured as its Trusted Publisher on npmjs.com.
       - name: Publish new versions
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for dir in packages/*/; do
             name=$(node -p "require('./${dir}package.json').name")
@@ -43,6 +46,6 @@ jobs:
             if npm view "${name}@${version}" version >/dev/null 2>&1; then
               echo "${name}@${version} already published, skipping"
             else
-              npm publish --workspace "$dir" --provenance --access public
+              npm publish --workspace "$dir" --access public
             fi
           done
