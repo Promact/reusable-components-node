@@ -5,7 +5,7 @@ Provider-agnostic email sending for Node.js/TypeScript — AWS SES, SendGrid, SM
 ## Usage
 
 ```ts
-import { createSesEmailService } from 'email-service';
+import { createSesEmailService } from '@promact/email-service';
 
 const emailService = createSesEmailService({ region: 'us-east-1' });
 
