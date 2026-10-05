@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@launchdarkly/node-server-sdk": "^9.13.1",
-    "unleash-client": "^6.12.1"
+    "unleash-client": "^6.12.2"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
