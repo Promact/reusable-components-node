@@ -1,6 +1,6 @@
 {
   "name": "@promact/feature-flag-management",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Provider-agnostic feature flag service (PostHog, LaunchDarkly, Unleash)",
   "license": "MIT",
   "repository": {
