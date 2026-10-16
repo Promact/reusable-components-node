@@ -52,8 +52,10 @@ and `npm test` on every push and pull request against `master`.
 
 Packages are published to npm under the `@promact` scope by
 `.github/workflows/publish.yml`, which runs when a GitHub Release is published
-(or manually via "Run workflow"). It builds, lints, and tests, then publishes
-any package whose version isn't on npm yet. It authenticates with
+(or manually via "Run workflow"). It builds, lints, and tests, then stages
+(`npm stage publish`) any package whose version isn't on npm yet. A maintainer
+then approves each staged version on npmjs.com (**Staged Packages**) with 2FA,
+which publishes it. It authenticates with
 [npm trusted publishing](https://docs.npmjs.com/trusted-publishers), so no npm
 token is stored in the repo.
 
@@ -62,7 +64,8 @@ To release:
 1. Bump the `version` of each package you changed (e.g.
    `npm version patch -w @promact/email-service`) and merge to `master`.
 2. Create a GitHub Release. Versions already on npm are skipped, so only
-   bumped packages are published.
+   bumped packages are staged.
+3. Approve the staged versions on npmjs.com under **Staged Packages**.
 
 ### First-time setup
 
