@@ -1,6 +1,6 @@
 {
   "name": "@promact/file-service",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Provider-agnostic file storage service (AWS S3, Azure Blob Storage) — Node.js port of the .NET file-service nuget package",
   "license": "MIT",
   "repository": {

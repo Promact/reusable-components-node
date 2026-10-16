@@ -1,6 +1,6 @@
 {
   "name": "@promact/email-service",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Provider-agnostic email sending service (AWS SES, SendGrid, SMTP, Azure Communication Services)",
   "license": "MIT",
   "repository": {
