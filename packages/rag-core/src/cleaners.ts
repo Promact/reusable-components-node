@@ -6,18 +6,20 @@ import { ContentCleaner, DocumentElement, ExtractedDocument } from './models';
  * matching degrades. Includes ZWNJ/ZWJ (U+200C/D): this over-strips for Persian/Indic shaping
  * and emoji sequences; accepted trade-off for a security-first default (spec §8.2).
  */
-const INVISIBLE = new RegExp(
-  '[' +
-    [
-    '\\u00AD\\u034F\\u061C\\u115F\\u1160\\u17B4\\u17B5\\u180B-\\u180E\\u200B-\\u200F',
-    '\\u202A-\\u202E\\u2060-\\u206F\\u3164\\uFE00-\\uFE0F\\uFEFF\\uFFA0\\uFFF9-\\uFFFB',
-  ].join('') +
-    ']|[\\u{E0000}-\\u{E0FFF}]',
-  'gu',
-);
+const INVISIBLE_RANGES: ReadonlyArray<readonly [number, number]> = [
+  [0x00ad, 0x00ad], [0x034f, 0x034f], [0x061c, 0x061c], [0x115f, 0x1160], [0x17b4, 0x17b5],
+  [0x180b, 0x180e], [0x200b, 0x200f], [0x202a, 0x202e], [0x2060, 0x206f], [0x3164, 0x3164],
+  [0xfe00, 0xfe0f], [0xfeff, 0xfeff], [0xffa0, 0xffa0], [0xfff9, 0xfffb], [0xe0000, 0xe0fff],
+];
+
+const isInvisible = (cp: number): boolean => INVISIBLE_RANGES.some(([lo, hi]) => cp >= lo && cp <= hi);
 
 export function stripInvisible(text: string): string {
-  return text.replace(INVISIBLE, '');
+  let out = '';
+  for (const ch of text) {
+    if (!isInvisible(ch.codePointAt(0) as number)) out += ch;
+  }
+  return out;
 }
 
 /** NFKC + invisible-char removal + de-hyphenation + whitespace collapse (prose only). */
