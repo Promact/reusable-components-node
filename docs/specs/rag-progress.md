@@ -17,7 +17,7 @@ Status: `[ ]` todo · `[~]` in progress · `[x]` done · `[!]` blocked
 | [x] | NRAG-07 | Models + interfaces (§6.1–6.4) and `createRag` factory skeleton with eager validation (§6.5). Ollama adapters can wait. | §6 (l.195–391) |
 | [x] | NRAG-08 | `TokenCounter` (exact + approximate w/ margin), TXT + Markdown extractors → element model, compact Markdown renderer (table as Markdown or CSV, whichever is fewer tokens). | §6.1, §8.1 (l.494–502) |
 | [x] | NRAG-09 | Cleaner chain: `whitespaceUnicodeCleaner`, `duplicateBlockCleaner` (+ stats of what was removed). Include an invisible/zero-width-character injection test. | §8.2 (l.504–512) |
-| [ ] | NRAG-10 | Structure-aware token-budgeted chunker: heading-path prefix, never > `maxTokens`, no mid-table/code splits, parent–child, row-group chunking with repeated header. Chunk id = hash(documentId, contentHash, occurrence). | §6.2, §8.3 (l.514–522) |
+| [x] | NRAG-10 | Structure-aware token-budgeted chunker: heading-path prefix, never > `maxTokens`, no mid-table/code splits, parent–child, row-group chunking with repeated header. Chunk id = hash(documentId, contentHash, occurrence). | §6.2, §8.3 (l.514–522) |
 | [ ] | NRAG-11 | In-memory `VectorStore` + `IngestionPipeline` with incremental logic (doc hash skip, chunk reuse via `findByContentHash`, `documentVersion` last-writer-wins → `stale`, delete). Use a deterministic fake `EmbeddingModel` in tests. | §6.2–6.3, §8.4 (l.524–534), §10.1 |
 | [ ] | NRAG-12 | Retriever (mandatory tenant/ACL filter applied inside the store search, `minScore`, MMR) + context packer (budget − margin, default 4000, merge adjacent, parent expansion if room, edge ordering, `[n]` citations) + `KnowledgeRetriever`. Cross-tenant leakage test. | §6.4, §8.5 (l.536–549) |
 
