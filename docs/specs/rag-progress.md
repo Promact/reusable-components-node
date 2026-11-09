@@ -12,7 +12,7 @@ Status: `[ ]` todo · `[~]` in progress · `[x]` done · `[!]` blocked
 
 | Status | ID | Item | Read in spec |
 |---|---|---|---|
-| [ ] | NRAG-03-lite | Pick and verify deps for M1 only: tokenizer (`gpt-tokenizer` vs `js-tiktoken`), Markdown parser (`remark-parse`/`unified`/`mdast` types). `npm view <pkg> version license`. Record choice + versions + licences in `docs/adr/0001-rag-core-dependencies.md` (short). Note: remark/unified are ESM-only; this repo builds CommonJS — choose a version/approach that works with CommonJS + ts-jest, or a CJS-compatible alternative, and say why. | §4 (l.120–147) |
+| [x] | NRAG-03-lite | Pick and verify deps for M1 only: tokenizer (`gpt-tokenizer` vs `js-tiktoken`), Markdown parser (`remark-parse`/`unified`/`mdast` types). `npm view <pkg> version license`. Record choice + versions + licences in `docs/adr/0001-rag-core-dependencies.md` (short). Note: remark/unified are ESM-only; this repo builds CommonJS — choose a version/approach that works with CommonJS + ts-jest, or a CJS-compatible alternative, and say why. | §4 (l.120–147) |
 | [ ] | NRAG-06 | Scaffold `packages/rag-core` (copy `file-service` layout), `"private": true`, Jest `coverageThreshold` 100% lines for this package. | §5 (l.149–193), §12 (l.717–743) |
 | [ ] | NRAG-07 | Models + interfaces (§6.1–6.4) and `createRag` factory skeleton with eager validation (§6.5). Ollama adapters can wait. | §6 (l.195–391) |
 | [ ] | NRAG-08 | `TokenCounter` (exact + approximate w/ margin), TXT + Markdown extractors → element model, compact Markdown renderer (table as Markdown or CSV, whichever is fewer tokens). | §6.1, §8.1 (l.494–502) |
