@@ -249,6 +249,20 @@ describe('structureChunker — parent/child', () => {
 });
 
 describe('structureChunker — validation & abort', () => {
+  it('never exceeds a tiny maxTokens: drops code fences that alone exceed it, and refuses impossible budgets', async () => {
+    const counter = exactTokenCounter();
+    const code: DocumentElement = { kind: 'code', language: 'typescript', text: 'const a = 1;\nconst b = 2;' };
+    const cs = await run(mk([code]), 4, 4, counter);
+    expect(cs.length).toBeGreaterThan(1);
+    for (const c of cs) expect(c.tokenCount).toBeLessThanOrEqual(4);
+    const all = leaves(cs).map((c) => c.text).join(' ');
+    expect(all).not.toContain('```');
+    expect(all.replace(/\s+/g, '')).toBe('consta=1;constb=2;');
+    // a single code point costs more than maxTokens: no valid chunking exists, so fail loudly
+    const twoPerCp: TokenCounter = { count: (t) => Array.from(t).length * 2 };
+    await expect(run(mk([P('ab')]), 1, 1, twoPerCp)).rejects.toThrow(/too small/);
+  });
+
   it('rejects invalid budgets and unsupported overlap', async () => {
     await expect(run(mk([P('a')]), 0, 10)).rejects.toThrow(/targetTokens/);
     await expect(run(mk([P('a')]), 20, 10)).rejects.toThrow(/targetTokens/);

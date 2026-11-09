@@ -126,6 +126,11 @@ export function structureChunker(opts: StructureChunkerOptions = {}): Chunker {
         const fence = (body: string) => `\`\`\`${lang}\n${body}\n\`\`\``;
         const whole = fence(el.text);
         if (fitsMax(whole)) return mk([whole]);
+        if (!fitsTarget(fence('x'))) {
+          // the fence markers alone use up the budget: emit the code lines unfenced rather than exceed it
+          const plain = groupLines(el.text.split('\n'), (g) => fitsTarget(g.join('\n')), (l) => splitText(l, fitsTarget));
+          return mk(plain.map((g) => g.join('\n')));
+        }
         const groups = groupLines(
           el.text.split('\n'),
           (g) => fitsTarget(fence(g.join('\n'))),
@@ -174,6 +179,11 @@ export function structureChunker(opts: StructureChunkerOptions = {}): Chunker {
     let ordinal = 0;
     const make = (prefix: string, body: string, headingPath: string[], pages: number[], parentChunkId: string | undefined, role: 'leaf' | 'parent'): DocumentChunk => {
       const text = prefix + body;
+      const tokenCount = counter.count(text);
+      if (tokenCount > maxTokens) {
+        // last line of defence for the hard invariant: only reachable when maxTokens cannot hold a single code point
+        throw new Error(`chunking: maxTokens ${maxTokens} is too small for an indivisible piece of ${tokenCount} tokens`);
+      }
       const contentHash = sha(text);
       const occurrence = seen.get(contentHash) ?? 0;
       seen.set(contentHash, occurrence + 1);
@@ -182,7 +192,7 @@ export function structureChunker(opts: StructureChunkerOptions = {}): Chunker {
         documentId: doc.documentId,
         ordinal: ordinal++,
         text,
-        tokenCount: counter.count(text),
+        tokenCount,
         headingPath: [...headingPath],
         ...(parentChunkId ? { parentChunkId } : {}),
         ...(pages.length ? { pageStart: Math.min(...pages), pageEnd: Math.max(...pages) } : {}),
