@@ -153,6 +153,16 @@ export interface ScoredChunk {
   vector?: Float32Array;
 }
 
+/** Lightweight view of a stored chunk, used by incremental ingestion (no vectors). */
+export interface ChunkRef {
+  chunkId: string;
+  contentHash: string;
+  modelId: string;
+  documentVersion: number;
+  aclGroups: readonly string[];
+  metadata?: Readonly<Record<string, string>>;
+}
+
 export interface VectorStore {
   readonly capabilities: { hybrid: boolean; keyword: boolean; returnsVectors: boolean };
   ensureCollection(def: CollectionDefinition, signal?: AbortSignal): Promise<void>;
@@ -165,6 +175,12 @@ export interface VectorStore {
     signal?: AbortSignal,
   ): Promise<Map<string, Float32Array>>;
   search(collection: string, request: SearchRequest, signal?: AbortSignal): Promise<ScoredChunk[]>;
+  /**
+   * Lists the chunks stored for one document of one tenant. Not in the spec §6.3 sketch, but
+   * incremental ingestion (§8.4: doc-hash skip, vanished-chunk deletion, version check) cannot
+   * work without it. Must filter by tenantId inside the query.
+   */
+  listDocument(collection: string, filter: { tenantId: string; documentId: string }, signal?: AbortSignal): Promise<ChunkRef[]>;
 }
 
 export interface ChatModel {

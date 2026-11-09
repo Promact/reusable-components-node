@@ -5,3 +5,5 @@ export * from './render';
 export * from './extractors';
 export * from './cleaners';
 export * from './chunker';
+export * from './memoryStore';
+export * from './pipeline';

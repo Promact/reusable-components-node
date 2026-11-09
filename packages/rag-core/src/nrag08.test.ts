@@ -142,3 +142,14 @@ describe('markdownExtractor', () => {
     expect(s.elements[0]).toEqual({ kind: 'heading', level: 1, text: 'H' });
   });
 });
+
+describe('tokenCounterFor', () => {
+  it('selects the encoding by name', () => {
+    const { tokenCounterFor } = require('./tokenizer'); // eslint-disable-line @typescript-eslint/no-require-imports
+    const text = 'The quick brown fox 日本語';
+    expect(tokenCounterFor('o200k_base').count(text)).toBe(6);
+    expect(tokenCounterFor('cl100k_base').count(text)).toBe(8);
+    expect(tokenCounterFor(undefined).count(text)).toBe(6);
+    expect(tokenCounterFor('approximate').exact).toBe(false);
+  });
+});

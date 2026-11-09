@@ -46,11 +46,9 @@ describe('createRag', () => {
     bad({ graph: {} }, /chat model/);
   });
 
-  it('rejects not-yet-implemented operations', async () => {
+  it('keeps retrieval unimplemented until NRAG-12', async () => {
     const rag = createRag(base());
     const f = { tenantId: 't', aclGroups: [] };
-    await expect(rag.ingest({} as never)).rejects.toThrow(/not implemented/);
-    await expect(rag.deleteDocument('d', 't')).rejects.toThrow(/not implemented/);
     await expect(rag.getContext({ text: 'x', filter: f }, { maxTokens: 10 })).rejects.toThrow(/not implemented/);
   });
 });

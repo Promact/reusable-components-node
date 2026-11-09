@@ -11,6 +11,8 @@ import {
   RetrievalQuery,
   RetrievedContext,
 } from './models';
+import { createIngestionPipeline } from './pipeline';
+import { tokenCounterFor } from './tokenizer';
 
 export interface RagOptions {
   collection: string;
@@ -73,14 +75,22 @@ export function validateRagOptions(options: RagOptions): void {
   if (options.graph && !options.graph.chat) throw new RagConfigError('graph mode requires a chat model');
 }
 
-/** Validates eagerly and throws on bad config. Pipelines are wired in later items (NRAG-11/12). */
+/** Validates eagerly and throws on bad config. Retrieval is wired later (NRAG-12). */
 export function createRag(options: RagOptions): Rag {
   validateRagOptions(options);
+  const pipeline = createIngestionPipeline({
+    collection: options.collection,
+    extractors: options.extractors,
+    embeddings: options.embeddings,
+    vectorStore: options.vectorStore,
+    chunking: options.chunking,
+    tokenCounter: tokenCounterFor(options.tokenizer),
+  });
   const notReady = (what: string) => Promise.reject(new Error(`${what} is not implemented yet`));
   return {
     options,
-    ingest: (_source, _signal) => notReady('ingest'),
-    deleteDocument: (_id, _tenant, _signal) => notReady('deleteDocument'),
+    ingest: (source, signal) => pipeline.ingest(source, signal),
+    deleteDocument: (id, tenant, signal) => pipeline.deleteDocument(id, tenant, signal),
     getContext: (_q: RetrievalQuery, _b: ContextBudget, _s?: AbortSignal): Promise<RetrievedContext> =>
       notReady('getContext'),
   };
