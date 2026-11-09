@@ -7,3 +7,5 @@ export * from './cleaners';
 export * from './chunker';
 export * from './memoryStore';
 export * from './pipeline';
+export * from './retriever';
+export * from './packer';

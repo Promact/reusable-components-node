@@ -7,10 +7,8 @@ import {
   IngestionResult,
   KnowledgeRetriever,
   VectorStore,
-  ContextBudget,
-  RetrievalQuery,
-  RetrievedContext,
 } from './models';
+import { createKnowledgeRetriever } from './packer';
 import { createIngestionPipeline } from './pipeline';
 import { tokenCounterFor } from './tokenizer';
 
@@ -75,23 +73,28 @@ export function validateRagOptions(options: RagOptions): void {
   if (options.graph && !options.graph.chat) throw new RagConfigError('graph mode requires a chat model');
 }
 
-/** Validates eagerly and throws on bad config. Retrieval is wired later (NRAG-12). */
+/** Validates eagerly and throws on bad config. */
 export function createRag(options: RagOptions): Rag {
   validateRagOptions(options);
+  const counter = tokenCounterFor(options.tokenizer);
   const pipeline = createIngestionPipeline({
     collection: options.collection,
     extractors: options.extractors,
     embeddings: options.embeddings,
     vectorStore: options.vectorStore,
     chunking: options.chunking,
-    tokenCounter: tokenCounterFor(options.tokenizer),
+    tokenCounter: counter,
   });
-  const notReady = (what: string) => Promise.reject(new Error(`${what} is not implemented yet`));
+  const retriever = createKnowledgeRetriever({
+    collection: options.collection,
+    embeddings: options.embeddings,
+    vectorStore: options.vectorStore,
+    tokenCounter: counter,
+  });
   return {
     options,
     ingest: (source, signal) => pipeline.ingest(source, signal),
     deleteDocument: (id, tenant, signal) => pipeline.deleteDocument(id, tenant, signal),
-    getContext: (_q: RetrievalQuery, _b: ContextBudget, _s?: AbortSignal): Promise<RetrievedContext> =>
-      notReady('getContext'),
+    getContext: (query, budget, signal) => retriever.getContext(query, budget, signal),
   };
 }

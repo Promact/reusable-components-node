@@ -46,9 +46,11 @@ describe('createRag', () => {
     bad({ graph: {} }, /chat model/);
   });
 
-  it('keeps retrieval unimplemented until NRAG-12', async () => {
-    const rag = createRag(base());
-    const f = { tenantId: 't', aclGroups: [] };
-    await expect(rag.getContext({ text: 'x', filter: f }, { maxTokens: 10 })).rejects.toThrow(/not implemented/);
+  it('getContext refuses a query without a tenant filter before embedding or searching', async () => {
+    const o = base();
+    const rag = createRag(o);
+    await expect(rag.getContext({ text: 'x', filter: { tenantId: '', aclGroups: [] } }, { maxTokens: 10 })).rejects.toThrow(/tenantId/);
+    await expect(rag.getContext({ text: 'x', filter: undefined as never }, { maxTokens: 10 })).rejects.toThrow(/tenantId/);
+    expect(o.embeddings.embed).not.toHaveBeenCalled();
   });
 });

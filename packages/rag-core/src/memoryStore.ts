@@ -1,4 +1,6 @@
-import { ChunkRecord, CollectionDefinition, RecordFilter, ScoredChunk, SearchRequest, VectorStore } from './models';
+import {
+  ChunkRecord, CollectionDefinition, DocumentChunk, RecordFilter, RetrievalFilter, ScoredChunk, SearchRequest, VectorStore,
+} from './models';
 
 interface Collection {
   def: CollectionDefinition;
@@ -30,6 +32,15 @@ function keywordScore(query: string, text: string): number {
   let hit = 0;
   for (const w of q) if (t.has(w)) hit++;
   return hit / q.size;
+}
+
+/** Tenant AND at least one shared ACL group; throws on a missing or malformed filter. */
+function visibleTo(filter: RetrievalFilter | undefined, op: string): (r: ChunkRecord) => boolean {
+  if (!filter || typeof filter.tenantId !== 'string' || !filter.tenantId || !Array.isArray(filter.aclGroups)) {
+    throw new Error(`${op} requires a RetrievalFilter with tenantId and aclGroups`);
+  }
+  const allowed = new Set(filter.aclGroups);
+  return (r) => r.tenantId === filter.tenantId && r.aclGroups.some((g) => allowed.has(g));
 }
 
 /** In-memory reference store for tests and small deployments. Applies tenant/ACL filters inside search. */
@@ -104,16 +115,22 @@ export function memoryVectorStore(): VectorStore {
         }));
     },
 
-    async search(collection, request: SearchRequest) {
-      const { filter } = request;
-      if (!filter || !filter.tenantId || !Array.isArray(filter.aclGroups)) {
-        throw new Error('search requires a RetrievalFilter with tenantId and aclGroups');
+    async getByIds(collection, filter, chunkIds) {
+      const visible = visibleTo(filter, 'getByIds');
+      const c = get(collection);
+      const out: DocumentChunk[] = [];
+      for (const id of new Set(chunkIds)) {
+        const r = c.records.get(recordKey(filter.tenantId, id));
+        if (r && visible(r)) out.push(r.chunk);
       }
-      const allowed = new Set(filter.aclGroups);
+      return out;
+    },
+
+    async search(collection, request: SearchRequest) {
+      const visible = visibleTo(request.filter, 'search');
       const scored: ScoredChunk[] = [];
       for (const r of get(collection).records.values()) {
-        // security filter first: tenant AND at least one shared ACL group
-        if (r.tenantId !== filter.tenantId || !r.aclGroups.some((g) => allowed.has(g))) continue;
+        if (!visible(r)) continue; // security filter first
         if (isParent(r)) continue; // parents are fetched by id for expansion, never ranked
         const vec = request.vector ? cosine(request.vector, r.vector) : 0;
         const kw = request.text ? keywordScore(request.text, r.chunk.text) : 0;

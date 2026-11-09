@@ -186,6 +186,12 @@ export interface VectorStore {
    * work without it. Must filter by tenantId inside the query.
    */
   listDocument(collection: string, filter: { tenantId: string; documentId: string }, signal?: AbortSignal): Promise<ChunkRef[]>;
+  /**
+   * Fetches chunks (leaves or parents) by id for small-to-big expansion. Not in the spec §6.3
+   * sketch. The RetrievalFilter is mandatory and, like `search`, must be applied inside the query:
+   * ids the principal may not see are simply absent from the result.
+   */
+  getByIds(collection: string, filter: RetrievalFilter, chunkIds: string[], signal?: AbortSignal): Promise<DocumentChunk[]>;
 }
 
 export interface ChatModel {
