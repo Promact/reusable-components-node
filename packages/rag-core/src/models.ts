@@ -27,11 +27,25 @@ export interface ExtractionStats {
   pagesNeedingOcr: number[];
 }
 
+export interface CleaningStep {
+  cleaner: string;
+  charsRemoved: number;
+  elementsRemoved: number;
+}
+
+/** What the cleaner chain removed; steps are in execution order. */
+export interface CleaningStats {
+  charsRemoved: number;
+  elementsRemoved: number;
+  steps: CleaningStep[];
+}
+
 export interface ExtractedDocument {
   documentId: string;
   contentHash: string;
   elements: DocumentElement[];
   stats: ExtractionStats;
+  cleaning?: CleaningStats;
 }
 
 export interface ExtractionOptions {
