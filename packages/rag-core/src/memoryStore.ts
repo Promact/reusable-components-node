@@ -2,8 +2,11 @@ import { ChunkRecord, CollectionDefinition, RecordFilter, ScoredChunk, SearchReq
 
 interface Collection {
   def: CollectionDefinition;
+  /** Keyed by (tenantId, chunkId): chunk ids are only unique within a tenant (two tenants may share a documentId). */
   records: Map<string, ChunkRecord>;
 }
+
+const recordKey = (tenantId: string, chunkId: string): string => `${tenantId}\u0000${chunkId}`;
 
 /** Parent chunks (small-to-big) are stored for expansion but never embedded or ranked. */
 const isParent = (r: ChunkRecord): boolean => r.chunk.metadata?.role === 'parent';
@@ -61,7 +64,7 @@ export function memoryVectorStore(): VectorStore {
         if (!isParent(r) && r.vector.length !== c.def.dimensions) {
           throw new Error(`vector has ${r.vector.length} dimensions, collection expects ${c.def.dimensions}`);
         }
-        c.records.set(r.chunk.chunkId, r);
+        c.records.set(recordKey(r.tenantId, r.chunk.chunkId), r);
       }
     },
 
@@ -69,11 +72,11 @@ export function memoryVectorStore(): VectorStore {
       if (!filter.tenantId) throw new Error('delete requires tenantId');
       const c = get(collection);
       const ids = filter.chunkIds ? new Set(filter.chunkIds) : undefined;
-      for (const [id, r] of c.records) {
+      for (const [key, r] of c.records) {
         if (r.tenantId !== filter.tenantId) continue;
         if (filter.documentId !== undefined && r.chunk.documentId !== filter.documentId) continue;
-        if (ids && !ids.has(id)) continue;
-        c.records.delete(id);
+        if (ids && !ids.has(r.chunk.chunkId)) continue;
+        c.records.delete(key);
       }
     },
 

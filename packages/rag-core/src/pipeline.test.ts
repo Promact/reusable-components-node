@@ -205,6 +205,20 @@ describe('ingestion pipeline — incremental', () => {
     expect(await search('sick', 'globex')).toHaveLength(0);
   });
 
+  it('keeps both tenants\' copies when they ingest identical content under the same documentId', async () => {
+    const { pipeline, search, store } = setup();
+    await pipeline.ingest(src(DOC, { tenantId: 'acme' }));
+    await pipeline.ingest(src(DOC, { tenantId: 'globex' }));
+    expect(await search('sick', 'acme')).toHaveLength(1);
+    expect(await search('sick', 'globex')).toHaveLength(1);
+    const acme = await store.listDocument('kb', { tenantId: 'acme', documentId: 'doc1' });
+    expect(acme.length).toBeGreaterThan(0);
+    // re-ingesting acme's copy is a no-op, not a re-index of a record globex overwrote
+    expect((await pipeline.ingest(src(DOC, { tenantId: 'acme' }))).outcome).toBe('unchanged');
+    await pipeline.deleteDocument('doc1', 'globex');
+    expect(await search('sick', 'acme')).toHaveLength(1);
+  });
+
   it('deletes only the requested tenant\'s document', async () => {
     const { pipeline, search, store } = setup();
     await pipeline.ingest(src(DOC, { tenantId: 'acme' }));

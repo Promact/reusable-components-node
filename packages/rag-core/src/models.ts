@@ -163,6 +163,11 @@ export interface ChunkRef {
   metadata?: Readonly<Record<string, string>>;
 }
 
+/**
+ * Adapters must treat `(tenantId, chunkId)` as the record identity: chunk ids are derived from
+ * `documentId` (§6.2), which is only unique within a tenant, so keying on `chunkId` alone lets one
+ * tenant overwrite another tenant's records.
+ */
 export interface VectorStore {
   readonly capabilities: { hybrid: boolean; keyword: boolean; returnsVectors: boolean };
   ensureCollection(def: CollectionDefinition, signal?: AbortSignal): Promise<void>;
