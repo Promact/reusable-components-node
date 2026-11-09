@@ -38,7 +38,7 @@ The component ships in **two forms built from one codebase**:
 - The server is a **thin HTTP layer over the same packages**. It contains no retrieval logic
   of its own, so a bug fix or improvement in a package reaches both forms.
 - The library is built first (Goal 1), including GraphRAG. The server (Goal 2) is a **later
-  stage**: it starts only after the library's public API is stable, at v0.2 (§14).
+  stage**: it starts only after the library's public API is stable, after v0.3 (§14).
 - Behaviour parity is tested. The same golden-set evaluation (§11.2) runs against the library
   directly and against the server over HTTP, and the results must match.
 
@@ -162,7 +162,8 @@ packages/
 ├── rag-extract-office/     → @promact/rag-extract-office    DOCX (`mammoth`, BSD-2), XLSX (`exceljs`, MIT),
 │                                                             PPTX (OOXML via `yauzl` + `fast-xml-parser`, MIT)
 ├── rag-extract-html/       → @promact/rag-extract-html      `cheerio` + `@mozilla/readability` (MIT / Apache-2.0)
-├── rag-extract-azure-di/   → @promact/rag-extract-azure-di  Azure Document Intelligence (OCR + layout)
+├── rag-extract-ocr/        → @promact/rag-extract-ocr       local OCR, `tesseract.js` (Apache-2.0), offline
+├── rag-extract-azure-di/   → @promact/rag-extract-azure-di  Azure Document Intelligence (cloud OCR + layout)
 ├── rag-embed-openai/       → @promact/rag-embed-openai      OpenAI + Azure OpenAI embeddings
 ├── rag-embed-local/        → @promact/rag-embed-local       transformers.js ONNX models (no egress)
 ├── rag-store-pgvector/     → @promact/rag-store-pgvector    vectors + graph tables in Postgres
@@ -436,7 +437,7 @@ citations and incremental updates possible.
 | Mode | How it works | Good for |
 |---|---|---|
 | `graph-local` | Embed the query → find matching entities (vector search on entity embeddings) → expand 1–2 hops (capped fan-out) → collect relationships + linked chunks → rank → pack. | Questions about specific things and how they relate. |
-| `graph-global` *(later, M5)* | Search community summaries at a chosen level → pack the best summaries (with their source citations). Map-reduce answering over all communities is **A/G's job** and deferred. | Thematic / "across everything" questions. |
+| `graph-global` *(later, M6)* | Search community summaries at a chosen level → pack the best summaries (with their source citations). Map-reduce answering over all communities is **A/G's job** and deferred. | Thematic / "across everything" questions. |
 | `mix` | Run `hybrid` and `graph-local` in parallel; fuse with RRF; pack chunks and graph facts in one budget. | Default when graph is enabled; a safe choice when the question type is unknown. |
 
 **Token-efficient rendering of graph facts:** relationships are packed as one-line triples
@@ -460,7 +461,7 @@ one tenant. Rules:
   chunks); `graph-global` only returns summaries whose partition the principal can fully see.
   This costs extra summaries. If it proves too expensive, the fallback (decided in Phase 0) is
   to disable `graph-global` for collections with mixed ACLs.
-- A dedicated leakage test covers both tenant and ACL cases (§14, M5).
+- A dedicated leakage test covers both tenant and ACL cases (§14, M3 and M6).
 
 ### 7.6 Cost controls
 
@@ -801,37 +802,49 @@ Sizes: **S** ≤ 2 days, **M** ≤ 1 week, **L** ≤ 2 weeks. Every item inherit
 | NRAG-27 | Graph tables in `rag-store-pgvector` + in-memory graph store; `graph-local` and `mix` modes; triple rendering in packer. | L | Graph golden queries beat vector-only recall; tokens/query reported; ACL leakage tests pass for entities and relations. |
 | NRAG-29 | Graph metrics, README graph section (cost, egress, all-local with Ollama). **Release v0.2.0** of the packages. | M | A library sample answers a relationship question with `[G n]` citations using only local models. |
 
-### M4 — Standalone service (Goal 2, later stage)
+### M4 — Scanned documents (OCR)
 
-Starts only after v0.2.0, once the library API (including graph modes) is stable. Until then,
-Node apps use the packages directly and .NET apps have no RAG option (the .NET package is paused,
-§16).
+Prioritized over the standalone service (§16). OCR runs **only on pages without a text layer**
+(flagged by NRAG-13) and on image files, never on whole documents that already have text.
+
+| ID | Item | Size | Done when |
+|---|---|---|---|
+| NRAG-30 | `OcrProvider` interface in core (`recognize(page image) → elements with confidence`); PDF page rasterization for flagged pages only (pdf.js + `@napi-rs/canvas`, MIT); image inputs (PNG, JPEG, TIFF). | M | Mixed PDF (text + scanned pages): only scanned pages are rasterized; text pages untouched. |
+| NRAG-31 | `rag-extract-ocr` — **local** OCR with `tesseract.js` (Apache-2.0), English model bundled for offline use. Default, because all-local is required from v0.1 (§16). | L | Scanned fixtures extract offline; low-confidence words are dropped or flagged rather than embedded as noise. |
+| NRAG-32 | `rag-extract-azure-di` — **optional cloud** OCR + layout (Azure Document Intelligence) for better tables and handwriting. Listed in the egress table. | M | Mocked unit tests; scanned-table fixture extracts as a table, not run-on text. |
+| NRAG-33 | OCR cleanup + limits: de-skew/rotation detection, per-page timeout, max OCR pages per document, OCR-pages metric. Eval: scanned golden queries. **Release v0.3.0** of the packages. | M | Recall on scanned fixtures within an agreed gap of their text-PDF twins; tokens/query reported. |
+
+### M5 — Standalone service (Goal 2, later stage)
+
+Starts only after v0.3.0, once the library API (including graph modes and OCR) is stable. Until
+then, Node apps use the packages directly and .NET apps have no RAG option (the .NET package is
+paused, §16).
 
 | ID | Item | Size | Done when |
 |---|---|---|---|
 | NRAG-19 | `rag-server`: Fastify app, config loader/validator (including graph settings), `/v1` routes for collections, ingest, jobs, retrieve, search, health. | L | Contract tests for every route; OpenAPI generated. |
 | NRAG-20 | Auth modes (`jwt`, `trusted-service`, `none`-guarded), API-key scopes, rate limits, problem+json errors. | M | Tests prove a body-supplied `tenantId` is ignored in `jwt` mode. |
 | NRAG-21 | In-process queue with Postgres job table; BullMQ option; `--role` split; graceful shutdown. | M | Kill-during-ingest test: job resumes, no duplicate chunks. |
-| NRAG-22 | Dockerfile (multi-arch, non-root, healthcheck), compose files (local + cloud), `publish-docker.yml` (GHCR, cosign, SBOM). | M | `docker compose -f docker-compose.local.yml up` → ingest a PDF → retrieve (including a graph query) works with no internet after image pull. |
+| NRAG-22 | Dockerfile (multi-arch, non-root, healthcheck), compose files (local + cloud), `publish-docker.yml` (GHCR, cosign, SBOM). Image bundles the tesseract English model. | M | `docker compose -f docker-compose.local.yml up` → ingest a text PDF and a scanned PDF → retrieve (including a graph query) works with no internet after image pull. |
 | NRAG-23 | `rag-client` generated from OpenAPI; README examples for curl, .NET, Python. | S | Client used by the parity eval run. |
-| NRAG-24 | Parity eval: library vs server results identical. **Release v0.3.0** (packages + image). | S | Image on GHCR; packages on npm. |
+| NRAG-24 | Parity eval: library vs server results identical. **Release v0.4.0** (packages + image). | S | Image on GHCR; packages on npm. |
 
-### M5 — Later (separate minor releases)
+### M6 — Later (separate minor releases)
 
 Per the decisions in §16:
 
 - **GraphRAG big-picture search (NRAG-28):** communities (Louvain) + ACL-partitioned summaries +
   `graph-global`, plus the rebuild job and endpoint. Done when global golden queries improve
   and ACL leakage tests pass for summaries.
-- **More formats:** `rag-extract-html`, `rag-extract-azure-di` (OCR for flagged pages only).
+- **More formats:** `rag-extract-html`.
 - **More providers:** `rag-rerank-cohere`, local ONNX reranker, `rag-store-qdrant`,
   `rag-store-azure-search`, `rag-graph-neo4j`.
 - Helm chart.
 
 **Critical path:** NRAG-01/02/03 → 06 → 07 → 08–10 → 11 → 12 → (13, 14, 15, 16 in parallel)
-→ 17 → 18 → 25 → 26 → 27 → 29 → 19 → 20/21 → 22 → 23 → 24.
-The standalone service (M4) is deliberately sequenced after GraphRAG (M3), so the server is
-built once against the final library API instead of being reworked when graph modes land.
+→ 17 → 18 → 25 → 26 → 27 → 29 → 30 → 31/32 → 33 → 19 → 20/21 → 22 → 23 → 24.
+The standalone service (M5) is deliberately sequenced after GraphRAG (M3) and OCR (M4), so the
+server is built once against the final library API instead of being reworked when they land.
 
 ---
 
@@ -859,13 +872,13 @@ Answered by the product owner on 2026-11-09. The rest of this spec already refle
 | # | Question | Decision | Effect on the plan |
 |---|---|---|---|
 | 1 | Which document types matter? | **All of them:** text PDF, Office (DOCX/XLSX/PPTX), scanned docs/images, HTML, Markdown, plain text. | Every format is in scope; none is dropped. |
-| 2 | Which formats ship first? | **PDF + Office + Markdown/TXT in v0.1.** HTML and scanned/OCR in later releases. | Matches the MVP in §5 and M2. `rag-extract-html` and `rag-extract-azure-di` stay in M5. |
-| 3 | First vector store? | **Postgres + pgvector.** | One database for vectors, graph and the job table. Qdrant and Azure AI Search move to M5. |
-| 4 | All-local / no-egress from v0.1? | **Yes.** | `rag-embed-local` and the Ollama adapters are in the MVP, so the library runs with no internet from v0.1. `docker-compose.local.yml` must do the same once the service ships (v0.3). |
+| 2 | Which formats ship first? | **PDF + Office + Markdown/TXT in v0.1.** Scanned/OCR next after GraphRAG (v0.3, ahead of the standalone service); HTML later. | Matches the MVP in §5 and M2. OCR is M4; `rag-extract-html` is M6. |
+| 3 | First vector store? | **Postgres + pgvector.** | One database for vectors, graph and the job table. Qdrant and Azure AI Search move to M6. |
+| 4 | All-local / no-egress from v0.1? | **Yes.** | `rag-embed-local` and the Ollama adapters are in the MVP, so the library runs with no internet from v0.1. `docker-compose.local.yml` must do the same once the service ships (v0.4). OCR is local by default (`tesseract.js`) for the same reason. |
 | 5 | Multi-tenancy model? | **Shared collection, filtered by tenant.** | Mandatory in-query tenant filter (§10) plus leakage tests. Moving one large tenant to its own collection later is a configuration change. GraphRAG graphs are always per tenant (§7.5). |
 | 6 | Languages? | **English only.** | English embedding model, tokenizer and Postgres `english` full-text configuration. Multilingual is a later change. |
 | 7 | Typical context budget? | **~4,000 tokens.** | `ContextBudget.maxTokens` defaults to 4000 (callers can override). Chunk defaults stay at 400 target / 600 max tokens. |
 | 8 | Still build the .NET NuGet RAG package? | **Paused.** | .NET apps call the standalone service over HTTP (§9.7). Revisit only if a .NET project needs it in-process. |
-| 9 | GraphRAG priority? | **Relationship search first; big-picture later.** | `graph-local` and `mix` ship in v0.2 (M3). Community detection, summaries and `graph-global` move to M5. |
-| 10 | Hosting? | **Each project self-hosts the Docker image.** | No Promact-run shared instance. Auth modes (§9.3) still ship with the service in v0.3 because a project may serve several of its own tenants, but a shared-instance operations setup (on-call, cross-project monitoring) is out of scope. |
-| 11 | When does the standalone service come? | **Later stage, after the library and GraphRAG.** | Order is v0.1 core library → v0.2 GraphRAG relationship search → v0.3 standalone service + Docker image (§14). |
+| 9 | GraphRAG priority? | **Relationship search first; big-picture later.** | `graph-local` and `mix` ship in v0.2 (M3). Community detection, summaries and `graph-global` move to M6. |
+| 10 | Hosting? | **Each project self-hosts the Docker image.** | No Promact-run shared instance. Auth modes (§9.3) still ship with the service in v0.4 because a project may serve several of its own tenants, but a shared-instance operations setup (on-call, cross-project monitoring) is out of scope. |
+| 11 | When does the standalone service come? | **Later stage, after the library, GraphRAG and scanned-document OCR.** | Order is v0.1 core library → v0.2 GraphRAG relationship search → v0.3 OCR → v0.4 standalone service + Docker image (§14). |
