@@ -25,6 +25,11 @@ progress is tracked in `docs/specs/rag-progress.md`.
   current item; don't read the whole spec.
 - After each item: `npm run build && npm run lint && npx jest packages/rag-core` must pass, then
   commit (one commit per item) and update `docs/specs/rag-progress.md`.
+- Cloud-run quirks (verified 2026-11-09): `git push` may print "unexpected disconnect" / "remote
+  end hung up" even though it succeeded. Before retrying, run
+  `git ls-remote --heads origin feat/rag-core` and compare with `git rev-parse HEAD`; if they
+  match, the push worked. Branch deletion is blocked (403) and `gh` is not authenticated, so
+  don't delete branches and don't try to open a PR; just push commits.
 - If a check still fails after two fix attempts, or the spec is ambiguous, record it under
   "Blocked / questions" in the progress file and move to the next independent item or stop.
   Never weaken a test or a security rule to make it pass.
