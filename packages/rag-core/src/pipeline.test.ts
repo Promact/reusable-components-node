@@ -182,6 +182,20 @@ describe('ingestion pipeline — incremental', () => {
     expect(await search('sick')).toHaveLength(1);
   });
 
+  it('remembers a newer version even when its content is unchanged, so an in-between older version is stale', async () => {
+    const { pipeline, search, store, emb } = setup();
+    await pipeline.ingest(src(DOC, { documentVersion: 1 }));
+    const calls = emb.calls;
+    expect((await pipeline.ingest(src(DOC, { documentVersion: 3 }))).outcome).toBe('unchanged');
+    expect(emb.calls).toBe(calls); // nothing re-embedded for a version bump
+    const refs = await store.listDocument('kb', { tenantId: 'acme', documentId: 'doc1' });
+    expect(refs.every((r) => r.documentVersion === 3)).toBe(true);
+    const r = await pipeline.ingest(src('# Leave\n\nVersion two content.', { documentVersion: 2 }));
+    expect(r.outcome).toBe('stale');
+    expect(await search('sick')).toHaveLength(1);
+    expect(await search('two')).toHaveLength(0);
+  });
+
   it('is last-writer-wins by version even when ingests race', async () => {
     const { pipeline, search } = setup();
     const [a, b] = await Promise.all([

@@ -101,7 +101,7 @@ export function createIngestionPipeline(options: IngestionPipelineOptions): Inge
     const extracted = await extractor.extract(source, { tokenCounter: counter }, signal);
     base.rawTokens = extracted.stats.rawTokens;
 
-    const unchanged =
+    const sameContent =
       existing.length > 0 &&
       existing.every(
         (r) =>
@@ -110,6 +110,9 @@ export function createIngestionPipeline(options: IngestionPipelineOptions): Inge
           r.modelId === embeddings.modelId &&
           sameSet(r.aclGroups, source.aclGroups),
       );
+    // A newer version with identical content still has to be recorded (re-upsert below, vectors reused),
+    // otherwise a version between the stored and the new one would later win the last-writer-wins check.
+    const unchanged = sameContent && existing.every((r) => r.documentVersion >= source.documentVersion);
     if (unchanged) {
       const leaves = existing.filter((r) => r.metadata?.role === 'leaf').length;
       return { ...base, outcome: 'unchanged', chunkCount: leaves };
@@ -150,7 +153,7 @@ export function createIngestionPipeline(options: IngestionPipelineOptions): Inge
 
     return {
       ...base,
-      outcome: existing.length ? 'updated' : 'indexed',
+      outcome: sameContent ? 'unchanged' : existing.length ? 'updated' : 'indexed',
       chunkCount: leaves.length,
       chunksEmbedded: leaves.filter((c) => !known.has(c.contentHash)).length,
       chunksReused: leaves.filter((c) => known.has(c.contentHash)).length,
