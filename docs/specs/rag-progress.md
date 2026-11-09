@@ -43,6 +43,8 @@ Each run: stop after its items, or earlier if blocked. Don't start an `L` item y
 
 Append one short entry per run: date/time, model, items finished, commits, anything notable.
 
+- 2026-11-09, Sonnet 5.5 (run 1): NRAG-03-lite, NRAG-06, NRAG-07 done (commits c9bd8b0, 127a716, 978f0da). Markdown stack pinned to CJS-compatible mdast-util-from-markdown 0.8.5 + GFM 0.x (see ADR 0001). `createRag` ingest/deleteDocument/getContext are stubs until NRAG-11/12; 'embedding dims vs existing collection' check needs async ensureCollection, deferred to NRAG-11. Spec §10 not read: `RetrievalFilter` defined as {tenantId, aclGroups}; verify against §10. gh unauthenticated per CLAUDE.md, so no draft PR opened.
+
 ## Blocked / questions for Roshni
 
 _(none yet)_
