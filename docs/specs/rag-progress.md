@@ -1,4 +1,4 @@
-# RAG build progress (M1 — core library)
+# RAG build progress
 
 Branch: `feat/rag-core`. Spec: `docs/specs/rag-service-spec.md` (line numbers below are
 approximate; search for the heading if they drift). Rules: see `CLAUDE.md`.
@@ -21,7 +21,21 @@ Status: `[ ]` todo · `[~]` in progress · `[x]` done · `[!]` blocked
 | [x] | NRAG-11 | In-memory `VectorStore` + `IngestionPipeline` with incremental logic (doc hash skip, chunk reuse via `findByContentHash`, `documentVersion` last-writer-wins → `stale`, delete). Use a deterministic fake `EmbeddingModel` in tests. | §6.2–6.3, §8.4 (l.524–534), §10.1 |
 | [x] | NRAG-12 | Retriever (mandatory tenant/ACL filter applied inside the store search, `minScore`, MMR) + context packer (budget − margin, default 4000, merge adjacent, parent expansion if room, edge ordering, `[n]` citations) + `KnowledgeRetriever`. Cross-tenant leakage test. | §6.4, §8.5 (l.536–549) |
 
-## Run plan
+## M2 — extractors and providers for v0.1 (branch `feat/rag-m2`)
+
+M1 is in PR #17 (`feat/rag-core` → master). M2 builds on top of it on `feat/rag-m2`.
+
+| Status | ID | Item | Read in spec |
+|---|---|---|---|
+| [x] | NRAG-34 | File-based `VectorStore` (`fileVectorStore({ path })`) in rag-core: atomic writes, base64 vectors, single-writer lock. | §10.3 |
+| [ ] | NRAG-15 | `rag-embed-openai`, `rag-embed-local` (transformers.js), Ollama embedding adapter in core. Mocked tests only. | §4, §5, §6.3 |
+| [ ] | NRAG-14 | `rag-extract-office` (DOCX, XLSX, PPTX) + zip-bomb/size/timeout limits. | §5, §8.1 |
+| [ ] | NRAG-13 | `rag-extract-pdf` (reading order, tables, OCR-needed flags, artifact + TOC cleaners). | §5, §8.1 |
+| [ ] | NRAG-16 | `rag-store-pgvector` (hybrid via Postgres full-text + RRF, in-query filters, `(tenantId, chunkId)` key). | §10.1 |
+| [ ] | NRAG-17 | Eval harness + file-store size limits. | §11.2 |
+| [ ] | NRAG-18 | Release v0.1.0 — **human only**. | §14 |
+
+## M1 run plan (done)
 
 - **Run 1 (Sonnet):** NRAG-03-lite, NRAG-06, NRAG-07.
 - **Run 2 (Sonnet):** NRAG-08, NRAG-09, NRAG-10; NRAG-11 if the run is still going well.
@@ -108,3 +122,9 @@ packer output is measured on the final rendered text, so it cannot exceed `maxTo
 
 **Look at first:** the `(tenantId, chunkId)` decision (it constrains every real adapter), then `src/packer.ts`
 (merge/adjacency rule relies on the chunker's ordinal numbering of parents and leaves).
+
+## M2 log
+
+- 2026-11-16, Opus 5.5 (interactive): spec gets the file-based store (NRAG-34, decision 12). NRAG-34 done: the memory
+  store logic moved to `storeCore.ts` (not exported) and is shared by `memoryVectorStore` and `fileVectorStore`.
+  19 tests (restart, exact float round-trip, leakage after reload, torn temp file, lock takeover rules, failed writes).

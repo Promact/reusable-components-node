@@ -6,6 +6,7 @@ export * from './extractors';
 export * from './cleaners';
 export * from './chunker';
 export * from './memoryStore';
+export * from './fileStore';
 export * from './pipeline';
 export * from './retriever';
 export * from './packer';
