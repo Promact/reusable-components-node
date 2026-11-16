@@ -29,7 +29,7 @@ M1 is in PR #17 (`feat/rag-core` → master). M2 builds on top of it on `feat/ra
 |---|---|---|---|
 | [x] | NRAG-34 | File-based `VectorStore` (`fileVectorStore({ path })`) in rag-core: atomic writes, base64 vectors, single-writer lock. | §10.3 |
 | [x] | NRAG-15 | `rag-embed-openai`, `rag-embed-local` (transformers.js), Ollama embedding adapter in core. Mocked tests only. | §4, §5, §6.3 |
-| [ ] | NRAG-14 | `rag-extract-office` (DOCX, XLSX, PPTX) + zip-bomb/size/timeout limits. | §5, §8.1 |
+| [x] | NRAG-14 | `rag-extract-office` (DOCX, XLSX, PPTX) + zip-bomb/size/timeout limits. | §5, §8.1 |
 | [ ] | NRAG-13 | `rag-extract-pdf` (reading order, tables, OCR-needed flags, artifact + TOC cleaners). | §5, §8.1 |
 | [ ] | NRAG-16 | `rag-store-pgvector` (hybrid via Postgres full-text + RRF, in-query filters, `(tenantId, chunkId)` key). | §10.1 |
 | [ ] | NRAG-17 | `packages/rag-eval` (private, never published): small fixture corpus we write ourselves (NRAG-04-lite: ~10 docs across MD/TXT/PDF/DOCX/XLSX/PPTX + ~20 golden queries), naive baseline (NRAG-05: fixed 512-char chunks, vector-only top-5), harness reporting recall@5, MRR, tokens/query with a deterministic fake embedder by default; measure file-store load time/memory at 1k/10k/50k chunks and put the numbers in the rag-core README. No CI workflow changes. | §11.2, §14 M0 |
@@ -153,3 +153,10 @@ packer output is measured on the final rendered text, so it cannot exceed `maxTo
   Xenova/all-MiniLM-L6-v2 384d). All 100% line coverage, no network. Decisions: Ollama/local/OpenAI all need `dimensions`
   (static on the interface); factories are `createOpenAiEmbeddings`, `createLocalEmbeddings`, `createOllamaEmbeddingModel`.
   Model licence for all-MiniLM-L6-v2 (Apache-2.0) could not be verified: sandbox blocks huggingface.co (see Blocked).
+- 2026-11-16, Sonnet 5.5 (run 2): NRAG-14 done. Baseline green (151 tests). New private `rag-extract-office` (mammoth 1.13 BSD-2,
+  exceljs 4.4 MIT, yauzl 3 + fast-xml-parser 5 MIT; jszip dev-only for fixtures). 174 tests total, 100% line coverage. Limits
+  (file size, entries, declared uncompressed total, compression ratio, timeout, AbortSignal) are checked from the zip central
+  directory before parsing; tested with crafted zips. Decisions: DOCX goes mammoth -> HTML -> elements; PPTX slides ordered by
+  file number (not presentation.xml order) and notes matched by number; sheet heading and slide title are level 1; hidden/empty
+  sheets are skipped (counted in `elementsDropped`); PPTX tables/images not extracted; mammoth/exceljs can't be cancelled so
+  timeout/abort reject promptly while the parser may finish in the background. Limits are factory options, not `ExtractionOptions`.
