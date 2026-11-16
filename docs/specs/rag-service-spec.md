@@ -127,8 +127,8 @@ avoid this). We keep them deliberately small (only what R calls) and ship adapte
 | Concern | Use | Notes |
 |---|---|---|
 | Embeddings | Our `EmbeddingModel` interface + adapters: OpenAI / Azure OpenAI (`openai`), Ollama (HTTP), local ONNX (`@huggingface/transformers`, i.e. transformers.js) | Phase 0 evaluates adopting the Vercel AI SDK (`ai`, `embedMany`) as **one adapter** behind our interface, not as the public API, so a churn in that SDK can't break consumers. |
-| Vector storage + search | Our `VectorStore` interface + adapters: in-memory (core), Postgres/pgvector (`pg`), Qdrant (`@qdrant/js-client-rest`), Azure AI Search (`@azure/search-documents`) | LangChain.js vector stores were considered and rejected as the public abstraction: too wide an API surface and too frequent breaking changes for a shared component. |
-| Graph storage | Our `GraphStore` interface + adapters: in-memory (core), Postgres tables (same DB as pgvector), Neo4j (`neo4j-driver`) | Postgres lets the all-local stack run on **one database** for vectors and graph. |
+| Vector storage + search | Our `VectorStore` interface + adapters: in-memory (core), file-based (core, no database server), Postgres/pgvector (`pg`), Qdrant (`@qdrant/js-client-rest`), Azure AI Search (`@azure/search-documents`) | LangChain.js vector stores were considered and rejected as the public abstraction: too wide an API surface and too frequent breaking changes for a shared component. |
+| Graph storage | Our `GraphStore` interface + adapters: in-memory (core), file-based (core), Postgres tables (same DB as pgvector), Neo4j (`neo4j-driver`) | Postgres lets the all-local stack run on **one database** for vectors and graph. |
 | Graph algorithms | `graphology` + `graphology-communities-louvain` (MIT) | Community detection for global search. Microsoft GraphRAG uses Leiden; no maintained JS Leiden exists, so we use Louvain and record this in the ADR. |
 | Token counting | `gpt-tokenizer` or `js-tiktoken` (pure JS, no native build) | Phase 0 picks one. An approximate counter covers vendors without a local tokenizer (e.g. Claude), as in .NET R6. |
 | Chat model (GraphRAG only) | Our `ChatModel` interface + adapters: OpenAI / Azure OpenAI, Anthropic (`@anthropic-ai/sdk`), Ollama | Used for entity/relationship extraction and community summaries. Structured (JSON) output required. |
@@ -157,7 +157,7 @@ heavy dependency gets its own package.
 ```
 packages/
 ├── rag-core/               → @promact/rag-core              models, interfaces, pipelines, cleaners, chunker,
-│                                                             retriever, packer, TXT/Markdown, in-memory stores
+│                                                             retriever, packer, TXT/Markdown, in-memory + file stores
 ├── rag-extract-pdf/        → @promact/rag-extract-pdf       pdf.js (`pdfjs-dist` / `unpdf`, Apache-2.0 / MIT)
 ├── rag-extract-office/     → @promact/rag-extract-office    DOCX (`mammoth`, BSD-2), XLSX (`exceljs`, MIT),
 │                                                             PPTX (OOXML via `yauzl` + `fast-xml-parser`, MIT)
@@ -481,6 +481,7 @@ visible and bounded:
 | Adapter | Package | Notes |
 |---|---|---|
 | In-memory | `rag-core` | Tests and small demos. |
+| File-based | `rag-core` | Same snapshot file as the file vector store (§10.3). Small single-server projects, no database. |
 | Postgres tables | `rag-store-pgvector` | `entities`, `relationships`, `communities` tables with pgvector columns for embeddings; k-hop expansion via recursive CTEs. **Recommended default:** one database for everything. |
 | Neo4j | `rag-graph-neo4j` | For teams that already run Neo4j or need deep traversals. Uses Neo4j's vector index for entity search. |
 
@@ -683,6 +684,35 @@ claim and community.
 re-indexed in the background, then the read alias switches. Vectors from different models are
 never mixed.
 
+### 10.3 Choosing a store (file-based option)
+
+Not every project runs Postgres. `rag-core` therefore ships a **file-based store** that needs no
+database server: `fileVectorStore({ path })` (and, from M3, a matching `GraphStore` in the same
+file). It is the in-memory store plus persistence, so it behaves identically in search, tenant/ACL
+filtering and incremental ingestion.
+
+| Store | Package | Use when | Limits |
+|---|---|---|---|
+| In-memory | `rag-core` | Tests, demos | Lost on restart. |
+| **File-based** | `rag-core` | Small apps on **one server**, no database to run | Whole index loaded into memory at start; one process per file; basic keyword scoring (no Postgres full-text). Size guidance (target: a few thousand documents / ~50k chunks) is measured in NRAG-17 and published in the README. |
+| Postgres + pgvector | `rag-store-pgvector` | Real products, several app instances, large corpora | Needs Postgres with the `vector` extension. |
+
+Design rules:
+
+- **No native dependencies.** Pure JS (Node `fs`), so it installs anywhere, including slim Docker
+  images. SQLite + a vector extension was considered and deferred: native binaries, more work,
+  and Postgres already covers larger projects.
+- **Crash-safe writes.** Write to a temp file in the same directory, `fsync`, then `rename` over
+  the old file; a crash leaves either the old or the new snapshot, never a torn one.
+- **Compact format.** Versioned header (format version, collection definitions); vectors stored as
+  base64 `Float32Array`, not JSON number arrays.
+- **Single writer.** A lock file (pid + host) is taken on open; a second process opening the same
+  file fails fast with a clear error instead of corrupting it.
+- **Writes are batched.** Mutations mark the store dirty and are flushed after each `upsert`/
+  `delete` call (one ingest = one write); `close()` flushes and releases the lock.
+- **Moving up is a re-index, not a migration.** Switching to pgvector means re-ingesting into the
+  new store; the README says so.
+
 ---
 
 ## 11. Observability and evaluation
@@ -790,7 +820,8 @@ Sizes: **S** ≤ 2 days, **M** ≤ 1 week, **L** ≤ 2 weeks. Every item inherit
 | NRAG-14 | `rag-extract-office` (DOCX, XLSX, PPTX) + zip-bomb/size/timeout limits. | L | Office fixtures pass; limit tests fail fast. |
 | NRAG-15 | `rag-embed-openai`, `rag-embed-local`, Ollama adapters in core. | M | Mocked unit tests; local model runs offline in eval. |
 | NRAG-16 | `rag-store-pgvector` (chunks, hybrid via Postgres full-text + RRF in SQL, filters in-query). | L | Integration job green; leakage test passes on Postgres. |
-| NRAG-17 | Eval harness + PR report + nightly job; OTel spans/metrics. | M | **recall@5 ≥ baseline at materially fewer tokens/query.** |
+| NRAG-34 | File-based `VectorStore` in `rag-core` (`fileVectorStore({ path })`, §10.3): crash-safe atomic writes, compact vector encoding, single-writer lock, same conformance tests as the in-memory store. | S | Restart keeps the index; killed-mid-write test leaves a readable file; second opener fails fast; leakage test passes. |
+| NRAG-17 | Eval harness + PR report + nightly job; OTel spans/metrics; measure file-store size limits. | M | **recall@5 ≥ baseline at materially fewer tokens/query.** |
 | NRAG-18 | **Release v0.1.0** of the MVP packages (README with compiling examples, egress table, capability matrix). | S | Live on npm under `@promact`. |
 
 ### M3 — GraphRAG relationship search (library)
@@ -799,7 +830,7 @@ Sizes: **S** ≤ 2 days, **M** ≤ 1 week, **L** ≤ 2 weeks. Every item inherit
 |---|---|---|---|
 | NRAG-25 | `ChatModel` interface; `rag-llm-openai`, `rag-llm-anthropic`, Ollama chat in core. | M | Mocked tests; JSON-schema output validated. |
 | NRAG-26 | `rag-graph`: extraction with hash cache + ingestion token budget; entity resolution. | L | Unchanged re-ingest costs 0 LLM tokens; merge/unmerge tests. |
-| NRAG-27 | Graph tables in `rag-store-pgvector` + in-memory graph store; `graph-local` and `mix` modes; triple rendering in packer. | L | Graph golden queries beat vector-only recall; tokens/query reported; ACL leakage tests pass for entities and relations. |
+| NRAG-27 | Graph tables in `rag-store-pgvector` + in-memory and file-based graph stores; `graph-local` and `mix` modes; triple rendering in packer. | L | Graph golden queries beat vector-only recall; tokens/query reported; ACL leakage tests pass for entities and relations. |
 | NRAG-29 | Graph metrics, README graph section (cost, egress, all-local with Ollama). **Release v0.2.0** of the packages. | M | A library sample answers a relationship question with `[G n]` citations using only local models. |
 
 ### M4 — Scanned documents (OCR)
@@ -841,7 +872,7 @@ Per the decisions in §16:
   `rag-store-azure-search`, `rag-graph-neo4j`.
 - Helm chart.
 
-**Critical path:** NRAG-01/02/03 → 06 → 07 → 08–10 → 11 → 12 → (13, 14, 15, 16 in parallel)
+**Critical path:** NRAG-01/02/03 → 06 → 07 → 08–10 → 11 → 12 → (13, 14, 15, 16, 34 in parallel)
 → 17 → 18 → 25 → 26 → 27 → 29 → 30 → 31/32 → 33 → 19 → 20/21 → 22 → 23 → 24.
 The standalone service (M5) is deliberately sequenced after GraphRAG (M3) and OCR (M4), so the
 server is built once against the final library API instead of being reworked when they land.
@@ -882,3 +913,4 @@ Answered by the product owner on 2026-11-09. The rest of this spec already refle
 | 9 | GraphRAG priority? | **Relationship search first; big-picture later.** | `graph-local` and `mix` ship in v0.2 (M3). Community detection, summaries and `graph-global` move to M6. |
 | 10 | Hosting? | **Each project self-hosts the Docker image.** | No Promact-run shared instance. Auth modes (§9.3) still ship with the service in v0.4 because a project may serve several of its own tenants, but a shared-instance operations setup (on-call, cross-project monitoring) is out of scope. |
 | 11 | When does the standalone service come? | **Later stage, after the library, GraphRAG and scanned-document OCR.** | Order is v0.1 core library → v0.2 GraphRAG relationship search → v0.3 OCR → v0.4 standalone service + Docker image (§14). |
+| 12 | Option for projects without a database? | **Yes: a file-based store, in the first release (v0.1).** | `fileVectorStore` in `rag-core` (NRAG-34, M2; §10.3). Pure JS, single server, small/medium corpora; Postgres + pgvector stays the default for real products. GraphRAG gets a file-based `GraphStore` in M3. |
