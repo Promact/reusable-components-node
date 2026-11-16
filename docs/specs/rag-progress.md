@@ -32,8 +32,23 @@ M1 is in PR #17 (`feat/rag-core` → master). M2 builds on top of it on `feat/ra
 | [ ] | NRAG-14 | `rag-extract-office` (DOCX, XLSX, PPTX) + zip-bomb/size/timeout limits. | §5, §8.1 |
 | [ ] | NRAG-13 | `rag-extract-pdf` (reading order, tables, OCR-needed flags, artifact + TOC cleaners). | §5, §8.1 |
 | [ ] | NRAG-16 | `rag-store-pgvector` (hybrid via Postgres full-text + RRF, in-query filters, `(tenantId, chunkId)` key). | §10.1 |
-| [ ] | NRAG-17 | Eval harness + file-store size limits. | §11.2 |
+| [ ] | NRAG-17 | `packages/rag-eval` (private, never published): small fixture corpus we write ourselves (NRAG-04-lite: ~10 docs across MD/TXT/PDF/DOCX/XLSX/PPTX + ~20 golden queries), naive baseline (NRAG-05: fixed 512-char chunks, vector-only top-5), harness reporting recall@5, MRR, tokens/query with a deterministic fake embedder by default; measure file-store load time/memory at 1k/10k/50k chunks and put the numbers in the rag-core README. No CI workflow changes. | §11.2, §14 M0 |
 | [ ] | NRAG-18 | Release v0.1.0 — **human only**. | §14 |
+
+## M2 run plan (cloud routines, off hours IST)
+
+- **Run 1 (Sonnet):** NRAG-15 embeddings.
+- **Run 2 (Sonnet):** NRAG-14 Office.
+- **Run 3 (Sonnet):** NRAG-13 PDF.
+- **Run 4 (Opus):** review NRAG-34/15/14/13 (checklist below), fix, then continue the next item only if clean.
+- **Run 5 (Sonnet):** NRAG-16 pgvector (if Postgres can't run in the cloud sandbox: unit tests with a mocked `pg`, integration tests gated on `RAG_PG_URL`, record it under Blocked).
+- **Run 6 (Sonnet):** NRAG-17 eval.
+- **Run 7 (Opus):** final M2 review, fixes, M2 review summary. Opens nothing on npm; NRAG-18 stays human.
+
+Each run: if its item is already [x], take the next unfinished one. M2 review checklist (adds to the M1 one): extractors
+enforce size/zip-bomb/timeout limits and fail fast; no network or model download in unit tests; every adapter keys
+records by `(tenantId, chunkId)` and filters tenant/ACL inside the query (SQL `WHERE`, not after); SQL is parameterised;
+licences permissive; every new package `"private": true`.
 
 ## M1 run plan (done)
 
