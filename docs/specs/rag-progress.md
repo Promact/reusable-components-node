@@ -28,7 +28,7 @@ M1 is in PR #17 (`feat/rag-core` → master). M2 builds on top of it on `feat/ra
 | Status | ID | Item | Read in spec |
 |---|---|---|---|
 | [x] | NRAG-34 | File-based `VectorStore` (`fileVectorStore({ path })`) in rag-core: atomic writes, base64 vectors, single-writer lock. | §10.3 |
-| [ ] | NRAG-15 | `rag-embed-openai`, `rag-embed-local` (transformers.js), Ollama embedding adapter in core. Mocked tests only. | §4, §5, §6.3 |
+| [x] | NRAG-15 | `rag-embed-openai`, `rag-embed-local` (transformers.js), Ollama embedding adapter in core. Mocked tests only. | §4, §5, §6.3 |
 | [ ] | NRAG-14 | `rag-extract-office` (DOCX, XLSX, PPTX) + zip-bomb/size/timeout limits. | §5, §8.1 |
 | [ ] | NRAG-13 | `rag-extract-pdf` (reading order, tables, OCR-needed flags, artifact + TOC cleaners). | §5, §8.1 |
 | [ ] | NRAG-16 | `rag-store-pgvector` (hybrid via Postgres full-text + RRF, in-query filters, `(tenantId, chunkId)` key). | §10.1 |
@@ -107,6 +107,9 @@ No item is blocked. Decisions made unattended that you may want to overrule:
 - **Merged context blocks** share one `[n]` label; `citations` has one entry per chunk with that label. Parent expansion
   cites the parent chunk id. Graph modes (`graph-local`/`graph-global`/`mix`) throw until GraphRAG exists.
 
+- **Embedding model licence unverified** (run M2-1): huggingface.co is blocked in the cloud sandbox, so Apache-2.0 for
+  `Xenova/all-MiniLM-L6-v2` is from memory of its model card. Please confirm (alternative: bge-small-en-v1.5, MIT).
+
 ## Review summary (run 3, Opus 5.5)
 
 **Checked** (`git diff origin/master...feat/rag-core`, packages/rag-core, against the checklist and spec §6.2–6.4,
@@ -143,3 +146,10 @@ packer output is measured on the final rendered text, so it cannot exceed `maxTo
 - 2026-11-16, Opus 5.5 (interactive): spec gets the file-based store (NRAG-34, decision 12). NRAG-34 done: the memory
   store logic moved to `storeCore.ts` (not exported) and is shared by `memoryVectorStore` and `fileVectorStore`.
   19 tests (restart, exact float round-trip, leakage after reload, torn temp file, lock takeover rules, failed writes).
+- 2026-11-16, Sonnet 5.5 (run 1): NRAG-15 done. Baseline green (123 tests). `OllamaEmbeddingModel` / `createOllamaEmbeddingModel`
+  in rag-core (`/api/embed`, batching, injectable `fetch`); new private packages `rag-embed-openai` (openai 7.57, Apache-2.0;
+  OpenAI + Azure, batching, SDK retries honour Retry-After, optional `dimensions`, retry test against a fake fetch) and
+  `rag-embed-local` (@huggingface/transformers 4.3.2, Apache-2.0; lazy load, normalised vectors, default
+  Xenova/all-MiniLM-L6-v2 384d). All 100% line coverage, no network. Decisions: Ollama/local/OpenAI all need `dimensions`
+  (static on the interface); factories are `createOpenAiEmbeddings`, `createLocalEmbeddings`, `createOllamaEmbeddingModel`.
+  Model licence for all-MiniLM-L6-v2 (Apache-2.0) could not be verified: sandbox blocks huggingface.co (see Blocked).

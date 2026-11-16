@@ -10,3 +10,4 @@ export * from './fileStore';
 export * from './pipeline';
 export * from './retriever';
 export * from './packer';
+export * from './ollamaEmbeddings';

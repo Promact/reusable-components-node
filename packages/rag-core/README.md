@@ -21,3 +21,8 @@ await store.close(); // on shutdown: waits for pending writes and releases the l
 Every change is written to disk before the call returns, using a temp file and an atomic rename,
 so a crash never leaves a half-written index. Moving to Postgres later means re-ingesting your
 documents.
+
+## Embeddings
+
+`createOllamaEmbeddingModel({ model: 'nomic-embed-text', dimensions: 768 })` talks to a local Ollama server over HTTP
+(`POST /api/embed`, global `fetch`, no SDK). Other providers: `@promact/rag-embed-openai`, `@promact/rag-embed-local`.
