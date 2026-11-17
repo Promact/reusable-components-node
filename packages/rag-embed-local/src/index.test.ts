@@ -82,7 +82,7 @@ describe('createLocalEmbeddings', () => {
   it('passes dtype and cacheDir to the loader', async () => {
     const { loader } = fakeLoader();
     await createLocalEmbeddings({ dimensions: 4, dtype: 'q8', cacheDir: '/tmp/m', model: 'org/custom', loadPipeline: loader }).embed(['x']);
-    expect(loader).toHaveBeenCalledWith('org/custom', { dtype: 'q8', cacheDir: '/tmp/m' });
+    expect(loader).toHaveBeenCalledWith('org/custom', { dtype: 'q8', cache_dir: '/tmp/m' });
   });
 
   it('default loader lazily imports transformers.js (mocked, no download)', async () => {
@@ -94,6 +94,12 @@ describe('createLocalEmbeddings', () => {
     const [v] = await m.embed(['hi']);
     expect(v).toHaveLength(384);
     expect(pipelineMock).toHaveBeenCalledWith('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {});
+  });
+
+  it('default loader hands cacheDir to transformers.js under its own option name (cache_dir)', async () => {
+    pipelineMock.mockResolvedValue(jest.fn(async () => ({ data: new Float32Array(384).fill(1), dims: [1, 384] })));
+    await createLocalEmbeddings({ cacheDir: '/models' }).embed(['hi']);
+    expect(pipelineMock).toHaveBeenLastCalledWith('feature-extraction', 'Xenova/all-MiniLM-L6-v2', { cache_dir: '/models' });
   });
 
   it('validates options eagerly', () => {

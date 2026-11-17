@@ -2,7 +2,8 @@ import type { EmbeddingModel } from '@promact/rag-core';
 import type { PretrainedModelOptions } from '@huggingface/transformers';
 
 type Dtype = Extract<PretrainedModelOptions['dtype'], string>;
-type LoadOptions = { dtype?: Dtype; cacheDir?: string };
+/** Passed to transformers.js `pipeline()`, so keys use its names (`cache_dir`, not `cacheDir`). */
+type LoadOptions = { dtype?: Dtype; cache_dir?: string };
 
 /** Minimal shape of a transformers.js feature-extraction pipeline. */
 export type FeatureExtractor = (
@@ -104,6 +105,6 @@ export function createLocalEmbeddings(options: LocalEmbeddingsOptions = {}): Emb
   if (!Number.isInteger(batchSize) || batchSize <= 0) throw new Error('rag-embed-local: batchSize must be a positive integer');
   const loadOptions: LoadOptions = {};
   if (options.dtype) loadOptions.dtype = options.dtype;
-  if (options.cacheDir) loadOptions.cacheDir = options.cacheDir;
+  if (options.cacheDir) loadOptions.cache_dir = options.cacheDir;
   return new LocalEmbeddingModel(`local:${model}`, dimensions, model, batchSize, loadOptions, options.loadPipeline ?? defaultLoader);
 }
