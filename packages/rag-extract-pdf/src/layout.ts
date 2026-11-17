@@ -69,7 +69,7 @@ function makeLine(page: PageInput, runs: TextRun[]): Line {
   return {
     page: page.page,
     y,
-    size: Math.max(...runs.map((r) => r.size)),
+    size: runs.reduce((m, r) => Math.max(m, r.size), 0),
     x: sorted[0].x,
     segs,
     text: segs.map((s) => s.text).join(' '),
@@ -93,7 +93,10 @@ export function pageLines(page: PageInput): Line[] {
   const runs = page.runs.filter((r) => r.str.trim() !== '');
   if (runs.length === 0) return [];
   const rows = groupRows(runs);
-  const mid = (Math.min(...runs.map((r) => r.x)) + Math.max(...runs.map((r) => r.x + r.width))) / 2;
+  // No spread into Math.min/max: a page can carry more runs than the engine's argument limit.
+  const minX = runs.reduce((m, r) => Math.min(m, r.x), Infinity);
+  const maxX = runs.reduce((m, r) => Math.max(m, r.x + r.width), -Infinity);
+  const mid = (minX + maxX) / 2;
 
   let crossing = 0;
   let split = 0;
@@ -122,7 +125,8 @@ export function pageLines(page: PageInput): Line[] {
   let leftBuf: Line[] = [];
   let rightBuf: Line[] = [];
   const flush = () => {
-    lines.push(...leftBuf, ...rightBuf);
+    for (const l of leftBuf) lines.push(l);
+    for (const l of rightBuf) lines.push(l);
     leftBuf = [];
     rightBuf = [];
   };

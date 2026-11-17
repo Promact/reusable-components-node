@@ -112,6 +112,17 @@ describe('layoutDocument', () => {
     expect(elements.some((e) => e.kind === 'table')).toBe(false);
   });
 
+  it('handles pages with more runs than the engine argument limit (no RangeError)', () => {
+    // One row of 200k runs, and 150k two-column rows: spreading these into Math.max / push overflowed the stack.
+    const wide = Array.from({ length: 200_000 }, (_, i) => run('x', 72 + (i % 400), 100 + Math.floor(i / 400) * 0.001, 11, 1));
+    expect(pageLines(page(1, wide)).length).toBeGreaterThan(0);
+    const tall = Array.from({ length: 300_000 }, (_, i) => run('some column text here', i % 2 ? 320 : 72, 80 + Math.floor(i / 2) * 12, 11, 200));
+    const lines = pageLines(page(1, tall));
+    expect(lines).toHaveLength(300_000);
+    expect(lines[0].x).toBe(72);
+    expect(lines[lines.length - 1].x).toBe(320);
+  });
+
   it('flags pages with little text for OCR and handles an empty document', () => {
     const r = layoutDocument([page(1, [run('Plenty of text on this page, enough to pass.', 72, 100)]), page(2, []), page(3, [run('tiny', 72, 100)])], opts);
     expect(r.pagesNeedingOcr).toEqual([2, 3]);
