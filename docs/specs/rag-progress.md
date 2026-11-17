@@ -112,6 +112,10 @@ No item is blocked. Decisions made unattended that you may want to overrule:
   **Resolved 2026-11-17:** verified via the Hugging Face API: both `Xenova/all-MiniLM-L6-v2` and
   `sentence-transformers/all-MiniLM-L6-v2` are tagged `license:apache-2.0`.
 
+- **Extractor isolation (run M2-4, product decision):** extractor timeouts can't stop CPU-bound pdf.js/mammoth/exceljs work
+  in-process. For untrusted uploads, should extraction run in a worker thread/child process with a memory cap (e.g. a
+  `runIsolated` option or a server-side concern)? Not blocking v0.1 code; affects the server design.
+
 ## Review summary (run 3, Opus 5.5)
 
 **Checked** (`git diff origin/master...feat/rag-core`, packages/rag-core, against the checklist and spec §6.2–6.4,
@@ -143,6 +147,45 @@ packer output is measured on the final rendered text, so it cannot exceed `maxTo
 **Look at first:** the `(tenantId, chunkId)` decision (it constrains every real adapter), then `src/packer.ts`
 (merge/adjacency rule relies on the chunker's ordinal numbering of parents and leaves).
 
+## M2 review (run 4)
+
+**Checked** (`git diff origin/feat/rag-core...feat/rag-m2`: NRAG-34 file store, NRAG-15 embeddings, NRAG-14 Office,
+NRAG-13 PDF) against the M1 + M2 checklists: extractor limits enforced before parsing (size, entries, declared and
+*real* uncompressed size, ratio, pages, timeout, abort), pdf.js options (eval off, no fonts/URL), XML entity expansion in
+fast-xml-parser 5.11 (nested entities not expanded: OK), crash on adversarial page sizes, no network/model download in
+unit tests (transformers.js and pdf.js workers mocked or local, OpenAI/Ollama via fakes), bounded retries (OpenAI SDK
+`maxRetries` default 4, Ollama none), API keys never logged or put in errors, tenant/ACL filtering in every store path and
+`(tenantId, chunkId)` keys preserved in the file store, reading order / table / OCR / TOC / header-footer behaviour tested
+on generated fixtures, licences (mammoth BSD-2, exceljs/yauzl/fast-xml-parser/pdf-lib MIT, openai/transformers/pdfjs
+Apache-2.0), every package `"private": true`.
+
+**Defects found and fixed** (one commit each, each with a test that failed before the fix):
+1. *Zip bomb bypass (security)* — `guardZip` checked only sizes *declared* in the central directory. yauzl's
+   `validateEntrySizes` protected PPTX (read via yauzl), but mammoth and exceljs unzip DOCX/XLSX themselves with JSZip,
+   so a file with understated sizes passed and was fully inflated by the parser. Every entry is now inflated and
+   discarded through yauzl (size-validated, abortable) before the parser runs (21100a2).
+2. *Crash on dense PDF pages* — `Math.min/max(...runs)` and `push(...lines)` threw an untyped `RangeError` above ~120k
+   text runs on one page (reachable with a crafted PDF well under 50 MB). Replaced with loops.
+3. *Ignored `cacheDir`* (rag-embed-local) — passed to transformers.js as `cacheDir`; it reads `cache_dir`, so models
+   always went to the default cache. The old test asserted the wrong key.
+4. *World-readable file store* — snapshot (all tenants' chunk text) and lock were created 0666 & umask (usually 0644).
+   Now 0600.
+5. *Listener leak* — both extractors added an `abort` listener to the caller's signal per call and never removed it.
+Plus a test-only guard that pdf.js is opened with `isEvalSupported: false` (CVE-2024-4367 mitigation for the pinned 3.x).
+
+**Not done in this run:** NRAG-16 (pgvector) is an L item scheduled for run 5; left untouched rather than half-done.
+
+**Remaining risks**
+- pdf.js runs in-process (fake worker); a CPU-heavy page blocks the event loop, so `timeoutMs` can only fire between
+  awaits. mammoth/exceljs likewise keep running after a TIMEOUT. For untrusted uploads, run extraction in a worker
+  thread/child process with a memory cap (product decision: add a `runIsolated` option?).
+- pdfjs-dist 3.11.174 is past end of fixes; safe only with `isEvalSupported: false` (now tested). Upgrade when ESM is possible.
+- DOCX: mammoth embeds images as base64 in its HTML (bounded by the 200 MB uncompressed limit but wasteful); exceljs can
+  use several × the XML size in memory for a 200 MB sheet. Consider lower default `maxUncompressedBytes` for XLSX.
+- Verifying DOCX/XLSX entries inflates them twice (once to check, once in the parser): CPU cost up to 2× on big files.
+- OpenAI adapter trusts `data[].index` (duplicates would mis-assign vectors; length is checked).
+- File store: a failed write leaves `<path>.<pid>.tmp` behind; stores created before this run stay 0644 until their next write.
+
 ## M2 log
 
 - 2026-11-16, Opus 5.5 (interactive): spec gets the file-based store (NRAG-34, decision 12). NRAG-34 done: the memory
@@ -170,3 +213,7 @@ packer output is measured on the final rendered text, so it cannot exceed `maxTo
   the first/last two elements of a page so "Step 1" body lines aren't mistaken for page numbers. Image-only pages are flagged
   in `stats.pagesNeedingOcr` but no `image` element is emitted. Encrypted PDFs are rejected (`ENCRYPTED`). Limits are factory
   options (50 MB, 500 pages, 60 s). Newer pdf.js versions have had security fixes; revisit when the repo can go ESM.
+- 2026-11-17, Opus 5.5 (run 4, review): baseline green (210 tests). Fixed 5 defects with regression tests (zip-bomb
+  bypass for DOCX/XLSX 21100a2, PDF RangeError on dense pages, rag-embed-local `cache_dir`, file store 0600, abort-listener
+  leak in both extractors) plus a CVE-2024-4367 guard test. 217 tests, 100% line coverage, build + lint green. NRAG-16
+  left for run 5. See "M2 review (run 4)".
