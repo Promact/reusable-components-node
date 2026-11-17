@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import { DocumentElement, DocumentExtractor, DocumentSource, exactTokenCounter } from '@promact/rag-core';
 import { OfficeExtractionError } from './errors';
-import { DEFAULT_LIMITS, guardZip, OfficeLimits } from './zipGuard';
+import { DEFAULT_LIMITS, guardZip, OfficeLimits, verifyEntries } from './zipGuard';
 import { extractDocx } from './docx';
 import { extractXlsx } from './xlsx';
 import { extractPptx } from './pptx';
@@ -90,6 +90,8 @@ export function createOfficeExtractor(options: OfficeExtractorOptions = {}): Doc
         const { zip, entries } = await guardZip(raw, limits);
         try {
           check();
+          // DOCX/XLSX parsers unzip the raw buffer themselves; prove the declared sizes first (PPTX is read via yauzl).
+          if (kind !== 'pptx') await verifyEntries(zip, entries, check);
           let elements: DocumentElement[];
           let dropped = 0;
           let pages: number | undefined;

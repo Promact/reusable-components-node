@@ -2,6 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { Readable } from 'stream';
 import JSZip from 'jszip';
+import mammoth from 'mammoth';
+import ExcelJS from 'exceljs';
 import { DocumentSource } from '@promact/rag-core';
 import { createOfficeExtractor, OfficeExtractionError, OfficeErrorCode } from './index';
 
@@ -187,6 +189,29 @@ describe('limits (fail fast, typed errors)', () => {
     const idx = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]));
     buf.writeUInt32LE(buf.readUInt32LE(idx + 24) - 10, idx + 24); // understate the uncompressed size
     expect(await code(createOfficeExtractor().extract(src(buf, PPTX), {}))).toBe('INVALID_ARCHIVE');
+  });
+
+  it('rejects a DOCX/XLSX whose deflate streams inflate past the declared sizes, before the parser runs', async () => {
+    // ~20 MB of zeros declared as 1000 bytes: passes the directory checks, so only inflating with size validation catches it.
+    const bomb = async (name: string) => {
+      const buf = Buffer.from(await zipOf({ [name]: Buffer.alloc(20_000_000) }));
+      const local = buf.indexOf(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
+      buf.writeUInt32LE(1000, local + 22);
+      const central = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]));
+      buf.writeUInt32LE(1000, central + 24);
+      return buf;
+    };
+    const convert = jest.spyOn(mammoth, 'convertToHtml');
+    const load = jest.spyOn(ExcelJS.Workbook.prototype, 'xlsx', 'get');
+    try {
+      expect(await code(createOfficeExtractor().extract(src(await bomb('word/document.xml'), DOCX), {}))).toBe('INVALID_ARCHIVE');
+      expect(await code(createOfficeExtractor().extract(src(await bomb('xl/workbook.xml'), XLSX), {}))).toBe('INVALID_ARCHIVE');
+      expect(convert).not.toHaveBeenCalled();
+      expect(load).not.toHaveBeenCalled();
+    } finally {
+      convert.mockRestore();
+      load.mockRestore();
+    }
   });
 
   it('rejects unsupported types', async () => {

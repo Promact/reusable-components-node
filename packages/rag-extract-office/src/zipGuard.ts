@@ -78,3 +78,22 @@ export function readEntry(zip: yauzl.ZipFile, entry: yauzl.Entry): Promise<Buffe
     });
   });
 }
+
+/**
+ * Inflates every entry and discards the bytes, so an entry whose deflate stream is larger than its declared size fails
+ * here (yauzl validateEntrySizes) instead of inside a third-party parser. Needed before handing the buffer to parsers
+ * that unzip on their own (mammoth and exceljs use JSZip, which trusts the deflate stream, not the declared sizes).
+ */
+export async function verifyEntries(zip: yauzl.ZipFile, entries: Map<string, yauzl.Entry>, check: () => void): Promise<void> {
+  for (const entry of entries.values()) {
+    check();
+    await new Promise<void>((resolve, reject) => {
+      zip.openReadStream(entry, (err, stream) => {
+        if (err || !stream) return reject(new OfficeExtractionError('INVALID_ARCHIVE', `Cannot read ${entry.fileName}: ${err?.message}`));
+        stream.on('data', () => undefined);
+        stream.on('end', resolve);
+        stream.on('error', (e) => reject(new OfficeExtractionError('INVALID_ARCHIVE', `Corrupt entry ${entry.fileName}: ${e.message}`)));
+      });
+    });
+  }
+}
