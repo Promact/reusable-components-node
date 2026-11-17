@@ -109,6 +109,8 @@ No item is blocked. Decisions made unattended that you may want to overrule:
 
 - **Embedding model licence unverified** (run M2-1): huggingface.co is blocked in the cloud sandbox, so Apache-2.0 for
   `Xenova/all-MiniLM-L6-v2` is from memory of its model card. Please confirm (alternative: bge-small-en-v1.5, MIT).
+  **Resolved 2026-11-17:** verified via the Hugging Face API: both `Xenova/all-MiniLM-L6-v2` and
+  `sentence-transformers/all-MiniLM-L6-v2` are tagged `license:apache-2.0`.
 
 ## Review summary (run 3, Opus 5.5)
 
