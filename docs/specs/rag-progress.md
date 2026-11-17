@@ -30,7 +30,7 @@ M1 is in PR #17 (`feat/rag-core` → master). M2 builds on top of it on `feat/ra
 | [x] | NRAG-34 | File-based `VectorStore` (`fileVectorStore({ path })`) in rag-core: atomic writes, base64 vectors, single-writer lock. | §10.3 |
 | [x] | NRAG-15 | `rag-embed-openai`, `rag-embed-local` (transformers.js), Ollama embedding adapter in core. Mocked tests only. | §4, §5, §6.3 |
 | [x] | NRAG-14 | `rag-extract-office` (DOCX, XLSX, PPTX) + zip-bomb/size/timeout limits. | §5, §8.1 |
-| [ ] | NRAG-13 | `rag-extract-pdf` (reading order, tables, OCR-needed flags, artifact + TOC cleaners). | §5, §8.1 |
+| [x] | NRAG-13 | `rag-extract-pdf` (reading order, tables, OCR-needed flags, artifact + TOC cleaners). | §5, §8.1 |
 | [ ] | NRAG-16 | `rag-store-pgvector` (hybrid via Postgres full-text + RRF, in-query filters, `(tenantId, chunkId)` key). | §10.1 |
 | [ ] | NRAG-17 | `packages/rag-eval` (private, never published): small fixture corpus we write ourselves (NRAG-04-lite: ~10 docs across MD/TXT/PDF/DOCX/XLSX/PPTX + ~20 golden queries), naive baseline (NRAG-05: fixed 512-char chunks, vector-only top-5), harness reporting recall@5, MRR, tokens/query with a deterministic fake embedder by default; measure file-store load time/memory at 1k/10k/50k chunks and put the numbers in the rag-core README. No CI workflow changes. | §11.2, §14 M0 |
 | [ ] | NRAG-18 | Release v0.1.0 — **human only**. | §14 |
@@ -162,3 +162,11 @@ packer output is measured on the final rendered text, so it cannot exceed `maxTo
   file number (not presentation.xml order) and notes matched by number; sheet heading and slide title are level 1; hidden/empty
   sheets are skipped (counted in `elementsDropped`); PPTX tables/images not extracted; mammoth/exceljs can't be cancelled so
   timeout/abort reject promptly while the parser may finish in the background. Limits are factory options, not `ExtractionOptions`.
+- 2026-11-17, Sonnet 5.5 (run 3): NRAG-13 done. Baseline green (174 tests); now 210, 100% line coverage in `rag-extract-pdf`.
+  New private package with `createPdfExtractor`, `pdfArtifactCleaner`, `pdfTocCleaner`, `PdfExtractionError`; ADR 0002.
+  Decisions: **pdfjs-dist 3.11.174** (Apache-2.0, last line with a CJS build; pinned exactly) over unpdf/ESM-only pdf.js 4+;
+  `pdf-lib` (MIT) dev-only for the 6 fixtures (< 5 KB each). pdf.js's `canvas` probe warnings are muted at lazy load. Layout
+  is heuristic (see ADR limits: >2 columns, merged-cell tables, rotated/RTL pages not handled). Artifact cleaner only considers
+  the first/last two elements of a page so "Step 1" body lines aren't mistaken for page numbers. Image-only pages are flagged
+  in `stats.pagesNeedingOcr` but no `image` element is emitted. Encrypted PDFs are rejected (`ENCRYPTED`). Limits are factory
+  options (50 MB, 500 pages, 60 s). Newer pdf.js versions have had security fixes; revisit when the repo can go ESM.
