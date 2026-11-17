@@ -152,6 +152,12 @@ describe('limits and failures', () => {
     expect(h.destroy).toHaveBeenCalled();
   });
 
+  it('opens PDFs with eval disabled (CVE-2024-4367 mitigation for pdfjs-dist 3.x) and no font/network loading', async () => {
+    await extract('table.pdf');
+    expect(pdfjs.getDocument).toHaveBeenLastCalledWith(expect.objectContaining({ isEvalSupported: false, disableFontFace: true, useSystemFonts: false }));
+    expect(pdfjs.getDocument.mock.lastCall[0]).not.toHaveProperty('url');
+  });
+
   it('removes its abort listener from the caller\'s signal after each extraction', async () => {
     const ctl = new AbortController();
     for (let i = 0; i < 3; i++) await createPdfExtractor().extract(src(fixture('table.pdf')), {}, ctl.signal);
