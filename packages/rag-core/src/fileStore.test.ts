@@ -40,6 +40,19 @@ describe('fileVectorStore', () => {
     expect(() => fileVectorStore({ path: '' })).toThrow('options.path');
   });
 
+  it('creates the snapshot and lock owner-only (0600), since they hold every tenant\'s text', async () => {
+    const mask = process.umask(0o022);
+    try {
+      const s = open();
+      await s.ensureCollection(def);
+      await s.upsert('c', [rec('a', 't1', ['g1'], 'secret', [1, 0])]);
+      expect(fs.statSync(file).mode & 0o777).toBe(0o600);
+      expect(fs.statSync(`${file}.lock`).mode & 0o777).toBe(0o600);
+    } finally {
+      process.umask(mask);
+    }
+  });
+
   it('keeps the index across a restart, including vectors, metadata and parents', async () => {
     const s = open();
     await s.ensureCollection(def);

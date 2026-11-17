@@ -5,6 +5,8 @@ import { Collection, storeOver } from './storeCore';
 
 const FORMAT = 'promact-rag-file-store';
 const VERSION = 1;
+/** Owner-only: the snapshot holds every tenant's chunk text, so it must not be world-readable under a default umask. */
+const FILE_MODE = 0o600;
 
 export interface FileVectorStoreOptions {
   /** Snapshot file. A `<path>.lock` file next to it marks the single process that has it open. */
@@ -50,7 +52,7 @@ function acquireLock(lockPath: string): void {
   const owner = { pid: process.pid, host: os.hostname() };
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      fs.writeFileSync(lockPath, JSON.stringify(owner), { flag: 'wx' });
+      fs.writeFileSync(lockPath, JSON.stringify(owner), { flag: 'wx', mode: FILE_MODE });
       return;
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
@@ -121,7 +123,7 @@ export function fileVectorStore(options: FileVectorStoreOptions): FileVectorStor
       })),
     };
     const tmp = `${path}.${process.pid}.tmp`;
-    const fh = await fs.promises.open(tmp, 'w');
+    const fh = await fs.promises.open(tmp, 'w', FILE_MODE);
     try {
       await fh.writeFile(JSON.stringify(snap));
       await fh.sync();
