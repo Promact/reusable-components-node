@@ -92,6 +92,7 @@ export function createPdfExtractor(options: PdfExtractorOptions = {}): DocumentE
         if (timeout.signal.aborted) throw new PdfExtractionError('TIMEOUT', `Extraction exceeded ${limits.timeoutMs} ms`);
       };
       let task: { destroy(): Promise<void> } | undefined;
+      let detach = (): void => undefined;
       const interrupted = new Promise<never>((_, reject) => {
         const fire = () => {
           try {
@@ -102,6 +103,7 @@ export function createPdfExtractor(options: PdfExtractorOptions = {}): DocumentE
         };
         timeout.signal.addEventListener('abort', fire);
         signal?.addEventListener('abort', fire);
+        detach = () => signal?.removeEventListener('abort', fire);
       });
       interrupted.catch(() => undefined);
 
@@ -156,6 +158,7 @@ export function createPdfExtractor(options: PdfExtractorOptions = {}): DocumentE
         };
       } finally {
         clearTimeout(timer);
+        detach(); // callers often reuse one long-lived signal; don't leak a listener per document
         void task?.destroy().catch(() => undefined);
       }
     },

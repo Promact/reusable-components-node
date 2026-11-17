@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { Readable } from 'stream';
+import { getEventListeners } from 'events';
 import { DocumentSource } from '@promact/rag-core';
 import { createPdfExtractor, DEFAULT_LIMITS, pdfArtifactCleaner, pdfTocCleaner, PdfExtractionError } from './index';
 
@@ -149,6 +150,13 @@ describe('limits and failures', () => {
     ctl.abort();
     expect((await rejection(p)).code).toBe('ABORTED');
     expect(h.destroy).toHaveBeenCalled();
+  });
+
+  it('removes its abort listener from the caller\'s signal after each extraction', async () => {
+    const ctl = new AbortController();
+    for (let i = 0; i < 3; i++) await createPdfExtractor().extract(src(fixture('table.pdf')), {}, ctl.signal);
+    await rejection(createPdfExtractor().extract(src(Buffer.from('not a pdf')), {}, ctl.signal));
+    expect(getEventListeners(ctl.signal, 'abort')).toHaveLength(0);
   });
 
   it('times out a stuck parser and destroys the pdf.js task', async () => {

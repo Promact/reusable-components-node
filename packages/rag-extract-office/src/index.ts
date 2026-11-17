@@ -75,10 +75,12 @@ export function createOfficeExtractor(options: OfficeExtractorOptions = {}): Doc
         if (timeout.signal.aborted) throw new OfficeExtractionError('TIMEOUT', `Extraction exceeded ${limits.timeoutMs} ms`);
       };
       // Third-party parsers cannot be cancelled, so race them: the caller gets the typed error promptly.
+      let detach = (): void => undefined;
       const interrupted = new Promise<never>((_, reject) => {
         const fire = () => { try { check(); } catch (e) { reject(e); } };
         timeout.signal.addEventListener('abort', fire);
         signal?.addEventListener('abort', fire);
+        detach = () => signal?.removeEventListener('abort', fire);
       });
       interrupted.catch(() => undefined);
 
@@ -121,6 +123,7 @@ export function createOfficeExtractor(options: OfficeExtractorOptions = {}): Doc
         };
       } finally {
         clearTimeout(timer);
+        detach(); // callers often reuse one long-lived signal; don't leak a listener per document
       }
     },
   };

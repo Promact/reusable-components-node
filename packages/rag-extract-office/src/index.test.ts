@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Readable } from 'stream';
+import { getEventListeners } from 'events';
 import JSZip from 'jszip';
 import mammoth from 'mammoth';
 import ExcelJS from 'exceljs';
@@ -236,6 +237,13 @@ describe('abort and timeout', () => {
     const p = createOfficeExtractor().extract(src(fx('sample.xlsx'), XLSX), {}, ac.signal);
     ac.abort();
     expect(await code(p)).toBe('ABORTED');
+  });
+
+  it('removes its abort listener from the caller\'s signal after each extraction', async () => {
+    const ctl = new AbortController();
+    for (let i = 0; i < 3; i++) await createOfficeExtractor().extract(src(fx('sample.docx'), DOCX), {}, ctl.signal);
+    await code(createOfficeExtractor().extract(src(Buffer.from('not a zip'), DOCX), {}, ctl.signal));
+    expect(getEventListeners(ctl.signal, 'abort')).toHaveLength(0);
   });
 
   it('rejects with TIMEOUT when the deadline passes', async () => {
